@@ -1,37 +1,47 @@
 # sync67 Agent Guidance
 
-## Project Structure
-- `ui/` - Qt windows, tabs, widgets
-- `services/` - System services and process management (ptp_service.py, pipewire_service.py, aes67_service.py)
-- `core/` - Shared helper functions and infrastructure
-- `widgets/` - Reusable GUI components
+## Projektstruktur
+- `ui/` – Qt Fenster, Tabs, Widgets
+- `services/` – Systemdienste und Prozessverwaltung (ptp_service.py, pipewire_service.py, aes67_service.py)
+- `core/` – Gemeinsame Hilfsfunktionen und Infrastruktur
+- `widgets/` – Wiederverwendbare GUI-Komponenten
 
-## Key Conventions
-- Strict separation of UI and logic: UI → Service Layer → System Process
-- Develop small, vertical features (e.g., complete PTP tab before moving to next module)
-- No GNOME-specific technologies; desktop-independent architecture
-- Distribution-independent (test on Linux Mint, Debian, Ubuntu, Arch)
+## Wichtige Entwicklungsprinzipien
+- **Kleine Schritte**: Keine riesigen Komplettlösungen. Kleine, testbare Features.
+- **Keine Überarchitektur**: Verständlich, wartbar, pragmatisch. Keine Enterprise-Patterns.
+- **Modularität**: UI, Services, Systemlogik, Widgets logisch trennen. Keine riesigen Dateien.
+- **Verständlichkeit vor Cleverness**: Einfache Wartbarkeit, Debugbarkeit, Erweiterbarkeit.
+- **UI und Funktionalität gemeinsam entwickeln**: GUI wächst organisch mit Features. Keine vollständig designte GUI ohne Funktionalität.
+- **Erst funktionierend, dann schön**: Stabilität und Funktion priorisieren, nicht perfektes UI-Design.
+- **Bestehende Linux-Audio-Tools respektieren**: sync67 ersetzt nicht qpwgraph, coppwr, helvum. Fokus auf Synchronisation, Monitoring, Runtime Control, AES67 Management.
+- **Strikte Trennung von UI und Logik**: UI → Service Layer → Systemprozess. GUI enthält keine direkte Systemlogik.
 
-## Technology Stack
+## Technologie-Stack
 - Python 3
-- Qt6 / PyQt6 (PySide6 not available in this environment)
+- Qt6 / PyQt6 (PySide6 nicht in dieser Umgebung verfügbar)
 - PipeWire
 - Linux PTP (ptp4l)
+- Keine GNOME-spezifischen Technologien; desktop-unabhängige Architektur
+- Distribution-unabhängig (Linux Mint, Debian, Ubuntu, Arch)
 
-## Current State
-- Early development / proof-of-concept phase
-- main.py is the application entry point
-- PTP tab implemented with:
-  * Network interface dropdown (populated via `ip link show`)
-  * Settings dialog for ethtool/ip link configuration (gro, gso, tso, sg, rx-usecs, multicast)
-  * START PTP button that runs configuration commands then launches `ptp4l -i $IFACE -m -l 6 -H`
-  * Terminal output area displaying command output
-- No build/test/lint configuration present yet
+## Aktueller Stand
+- Frühe Entwicklung / Proof-of-Concept-Phase
+- `main.py` ist der Anwendungseinstiegspunkt
+- PTP-Tab (MVP 0.1) vollständig implementiert mit:
+  * Netzwerkinterface-Dropdown (befüllt via `ip link show`)
+  * Settings-Dialog für ethtool/ip link Konfiguration (gro, gso, tso, sg, rx-usecs, multicast)
+  * START PTP Button → führt Konfigurationsbefehle aus, startet dann `ptp4l -i $IFACE -m -l 6 -H`
+  * STOP PTP Button → beendet ptp4l-Prozess
+  * Terminal-Ausgabebereich (schwarz/grün) für Befehlsausgaben und ptp4l-Logs
+  * Visuelle Ampel-Anzeige für PTP-Synchronisationsstabilität (grün/gelb/rot)
+  * Separate QProcess-Objekte für Konfigurationsbefehle und ptp4l
+  * sudo-Credential-Check via `sudo -n true` (User muss vorher `sudo -v` im Terminal ausführen)
+- Keine Build/Test/Lint-Konfiguration vorhanden
 
-## When Adding Features
-1. Follow the modular structure above
-2. Keep UI separate from system logic (use services/ for system commands)
-3. Implement small, testable increments
-4. Refer to docs/mvp.md for planned feature order
-5. For system commands, use QProcess with proper error handling
-6. Store user settings with QSettings
+## Beim Hinzufügen von Features
+1. Modular Struktur (ui/services/core/widgets) einhalten
+2. UI von Systemlogik trennen (services/ für Systembefehle)
+3. Kleine, testbare Schritte
+4. `docs/mvp.md` für geplante Feature-Reihenfolge beachten
+5. Für Systembefehle QProcess mit Fehlerbehandlung verwenden
+6. Benutzereinstellungen mit QSettings speichern

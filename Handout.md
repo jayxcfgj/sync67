@@ -41,7 +41,7 @@ Qt6
 
 ## Python Binding
 
-PySide6
+PyQt6
 
 ## Programmiersprache
 
@@ -124,6 +124,18 @@ Beispiel:
 * Funktioniert unter KDE, XFCE, Cinnamon etc.
 * PipeWire-native Architektur
 * Gute Integration in Linux Audio Workflows
+
+---
+
+# Aktueller Implementierungsstand
+
+- PTP Tab vollständig funktional mit:
+  * Netzwerkinterface auswählen (via `ip link show`)
+  * ptp4l starten/stoppen
+  * Live-Log anzeigen
+  * Sync-Status anzeigen (visuelle Ampel-Anzeige)
+  * Settings-Dialog für ethtool/ip link Konfiguration (gro, gso, tso, sg, rx-usecs, multicast)
+  * Trennung von UI und Systemlogik (UI → Service Layer → Systemprozess)
 
 ---
 
