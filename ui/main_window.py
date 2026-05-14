@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 from ui.ptp_tab import PTPTab
+from ui.aes67_tab import AES67Tab
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -12,3 +13,6 @@ class MainWindow(QMainWindow):
 
         self.ptp_tab = PTPTab()
         self.tabs.addTab(self.ptp_tab, "PTP")
+
+        self.aes67_tab = AES67Tab()
+        self.tabs.addTab(self.aes67_tab, "AES67")

@@ -136,25 +136,34 @@ Beispiel:
   * Sync-Status anzeigen (visuelle Ampel-Anzeige)
   * Settings-Dialog für ethtool/ip link Konfiguration (gro, gso, tso, sg, rx-usecs, multicast)
   * Trennung von UI und Systemlogik (UI → Service Layer → Systemprozess)
+- AES67 Tab vollständig funktional mit:
+  * Start/Stop Buttons für `pipewire-aes67`
+  * Terminal-Ausgabebereich für Logs und Fehlermeldungen
+  * Config-Button zum Öffnen von `~/.config/pipewire/pipewire-aes67.conf`
+  * Kein sudo erforderlich
+  * Wichtig: App läuft scheinbar als root (os.getuid() == 0). Daher müssen
+    `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` und `HOME` explizit auf
+    den User-Wert gesetzt werden (via `SUDO_UID` aus der Umgebung).
+    Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
 
 ---
 
-# Erste MVP-Ziele
+# MVP-Status
 
-## PTP Tab
+## ✅ PTP Tab (MVP 0.1 – abgeschlossen)
 
 * Netzwerkinterface auswählen
 * ptp4l starten/stoppen
 * Live-Log anzeigen
-* Sync-Status anzeigen
+* Sync-Status anzeigen (Ampel)
 
-## AES67 Tab
+## ✅ AES67 Tab (MVP 0.2 – abgeschlossen)
 
-* PipeWire AES67 starten
-* RTP Streams anzeigen
-* Streamstatus anzeigen
+* PipeWire AES67 starten/stoppen
+* Live-Log anzeigen
+* Config-Datei öffnen
 
-## System Tab
+## System Tab (MVP 0.3 – offen)
 
 * pw-top Informationen anzeigen
 * Quantum anzeigen

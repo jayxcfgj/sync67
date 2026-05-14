@@ -36,6 +36,15 @@
   * Visuelle Ampel-Anzeige für PTP-Synchronisationsstabilität (grün/gelb/rot)
   * Separate QProcess-Objekte für Konfigurationsbefehle und ptp4l
   * sudo-Credential-Check via `sudo -n true` (User muss vorher `sudo -v` im Terminal ausführen)
+- AES67-Tab (MVP 0.2) implementiert mit:
+  * Start/Stop Buttons für `pipewire-aes67`
+  * Terminal-Ausgabebereich für Logs und Fehlermeldungen
+  * Config-Button zum Öffnen von `~/.config/pipewire/pipewire-aes67.conf`
+  * Kein sudo erforderlich
+  * Wichtig: App läuft scheinbar als root (os.getuid() == 0). Daher müssen
+    `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` und `HOME` explizit auf
+    den User-Wert gesetzt werden (via `SUDO_UID` aus der Umgebung).
+    Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
 - Keine Build/Test/Lint-Konfiguration vorhanden
 
 ## Beim Hinzufügen von Features
