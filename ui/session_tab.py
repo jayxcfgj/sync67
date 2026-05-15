@@ -1,4 +1,4 @@
-"""Session Tab – Quick-Start, System-Status, Versionen, Routing-Tools."""
+"""Session Tab – Quick-Start, System-Status, Versions, Routing-Tools."""
 
 import subprocess
 import re
@@ -99,9 +99,9 @@ class SessionTab(QWidget):
         self.xruns_label.setStyleSheet('font-size: 22px; font-weight: bold; color: #e0e0e0;')
         self.xruns_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.xruns_label.mousePressEvent = lambda e: self._reset_xruns()
-        self.xruns_label.setToolTip('Klicken zum Zur\u00fccksetzen')
+        self.xruns_label.setToolTip('Click to reset')
         xruns_box.addWidget(self.xruns_label)
-        xruns_box.addWidget(QLabel('klick \u2192 reset'))
+        xruns_box.addWidget(QLabel('click \u2192 reset'))
         metrics.addLayout(xruns_box)
         metrics.addStretch()
 
@@ -121,8 +121,8 @@ class SessionTab(QWidget):
 
         layout.addLayout(metrics)
 
-        # ── Versionen ──
-        ver_group = QGroupBox('Versionen')
+        # ── Versions ──
+        ver_group = QGroupBox('Versions')
         ver_layout = QVBoxLayout(ver_group)
 
         def get_ver(cmd, flag='--version'):
@@ -202,7 +202,7 @@ class SessionTab(QWidget):
                 btn.setToolTip(f'{label} \u00f6ffnen')
                 btn.clicked.connect(lambda checked, a=args: subprocess.Popen(a))
             else:
-                btn.setToolTip(f'{cmd} nicht gefunden (PATH/Flatpak)')
+                btn.setToolTip(f'{cmd} not found (PATH/Flatpak)')
                 btn.setEnabled(False)
                 btn.setStyleSheet('color: #666;')
             return btn

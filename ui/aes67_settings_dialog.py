@@ -542,7 +542,7 @@ class AES67SettingsDialog(QDialog):
         self.system_clock_cb.setToolTip(
             'Wenn aktiviert: clock.interface wird auskommentiert.\n'
             'Die System-Clock wird statt der PHC verwendet.\n'
-            'Nötig wenn die App als root läuft und PHC Timestamp 0 liefert.'
+            'Needed when running as root and PHC returns timestamp 0.'
         )
         # Check if clock.interface is currently commented out
         is_commented = self._is_clock_interface_commented()
@@ -632,7 +632,7 @@ class AES67SettingsDialog(QDialog):
 
         rules_label = QLabel(
             'Bearbeite die SAP-Stream-Regeln direkt im SPA-Format.\n'
-            'Änderungen werden beim Apply übernommen.'
+            'Changes are applied on Apply.'
         )
         rules_label.setWordWrap(True)
         rules_layout.addWidget(rules_label)
@@ -651,7 +651,7 @@ class AES67SettingsDialog(QDialog):
         if rules_text:
             self.rules_editor.setPlainText(rules_text)
         else:
-            self.rules_editor.setPlainText('# Keine stream.rules gefunden')
+            self.rules_editor.setPlainText('# No stream.rules found')
         self.rules_editor.textChanged.connect(self._mark_changes)
 
         layout.addWidget(rules_group)
@@ -739,18 +739,18 @@ class AES67SettingsDialog(QDialog):
                     )
 
             self.config.save()
-            QMessageBox.information(self, 'Erfolg', 'Config gespeichert.')
+            QMessageBox.information(self, 'Success', 'Config saved.')
             self._has_changes = False
             self.accept()
 
         except Exception as e:
-            QMessageBox.critical(self, 'Fehler', f'Config konnte nicht gespeichert werden:\n{e}')
+            QMessageBox.critical(self, 'Error', f'Config could not be saved:\n{e}')
 
     def _on_cancel(self):
         if self._has_changes:
             reply = QMessageBox.question(
-                self, 'Änderungen verwerfen?',
-                'Es gibt ungespeicherte Änderungen. Trotzdem schliessen?',
+                self, 'Discard changes?',
+                'There are unsaved changes. Close anyway?',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply != QMessageBox.StandardButton.Yes:
@@ -759,9 +759,9 @@ class AES67SettingsDialog(QDialog):
 
     def _on_reset(self):
         reply = QMessageBox.warning(
-            self, 'Config zurücksetzen',
-            'Bist du sicher? Die aktuelle Config wird durch die\n'
-            'Default-Config von /usr/share/pipewire/pipewire-aes67.conf ersetzt.\n'
+            self, 'Reset Config',
+            'Are you sure? Your config will be replaced by the\n'
+            'default config from /usr/share/pipewire/pipewire-aes67.conf.\n'
             'Ein Backup wird als .bak gespeichert.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -770,12 +770,12 @@ class AES67SettingsDialog(QDialog):
         try:
             self.config.reset_to_default()
             self.config.load(self.config.get_loaded_path())
-            QMessageBox.information(self, 'Zurückgesetzt',
-                                    'Config auf Default zurückgesetzt.')
+            QMessageBox.information(self, 'Reset',
+                                    'Config reset to Default.')
             self._rebuild_sink_tabs()
             self._reload_all_widgets()
         except Exception as e:
-            QMessageBox.critical(self, 'Fehler', f'Reset fehlgeschlagen:\n{e}')
+            QMessageBox.critical(self, 'Error', f'Reset failed:\n{e}')
 
     def _reload_all_widgets(self):
         """Reload all widget values from config."""
@@ -808,7 +808,7 @@ class AES67SettingsDialog(QDialog):
         reply = QMessageBox.question(
             self, 'Sink entfernen',
             'Diesen Sink wirklich entfernen?\n'
-            'Die Konfiguration wird gelöscht.',
+            'The configuration will be deleted.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply != QMessageBox.StandardButton.Yes:

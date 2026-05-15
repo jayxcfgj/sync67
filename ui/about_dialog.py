@@ -1,4 +1,4 @@
-"""About-Dialog für sync67."""
+"""About dialog for sync67."""
 
 import subprocess
 import re

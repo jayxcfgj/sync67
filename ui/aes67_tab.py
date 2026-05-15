@@ -74,7 +74,7 @@ class AES67Tab(QWidget):
 
         config_group = QGroupBox("Configuration")
         config_layout = QHBoxLayout()
-        self.config_btn = QPushButton("Config öffnen")
+        self.config_btn = QPushButton("Open Config")
         self.config_btn.clicked.connect(self.open_config)
         config_layout.addWidget(self.config_btn)
 
@@ -117,12 +117,12 @@ class AES67Tab(QWidget):
                 if os.path.exists(self.default_config_path):
                     shutil.copy(self.default_config_path, self.config_path)
                     self.terminal_output.append(
-                        "Keine User-Config gefunden. Default kopiert nach:\n"
+                        "No user config found. Default copied to:\n"
                         f"  {self.config_path}"
                     )
                 else:
                     self.terminal_output.append(
-                        "FEHLER: Weder User-Config noch Default-Config gefunden."
+                        "ERROR: Neither user config nor default config found."
                     )
                     return
                 self._init_config()
@@ -189,10 +189,10 @@ class AES67Tab(QWidget):
             QProcess.startDetached("xdg-open", [self.config_path])
         else:
             self.terminal_output.append(
-                f"Config nicht gefunden unter: {self.config_path}"
+                f"Config not found at: {self.config_path}"
             )
             self.terminal_output.append(
-                "Lege eine Config-Datei an oder kopiere sie von\n"
+                "Create a config file or copy it from\n"
                 f"  {self.default_config_path}"
             )
 
@@ -200,22 +200,22 @@ class AES67Tab(QWidget):
         if not os.path.exists(self.config_path):
             if os.path.exists(self.default_config_path):
                 shutil.copy(self.default_config_path, self.config_path)
-                self.terminal_output.append("Default Config kopiert.")
+                self.terminal_output.append("Default config copied.")
             else:
-                self.terminal_output.append("Keine Config gefunden.")
+                self.terminal_output.append("No config found.")
                 return
             self._init_config()
 
         if self.config is None:
             self._init_config()
         if self.config is None:
-            self.terminal_output.append("Config konnte nicht geladen werden.")
+            self.terminal_output.append("Config could not be loaded.")
             return
 
         from ui.aes67_settings_dialog import AES67SettingsDialog
         dialog = AES67SettingsDialog(self.config, self)
         if dialog.exec() == AES67SettingsDialog.DialogCode.Accepted:
-            self.terminal_output.append("Config gespeichert über den Editor.")
+            self.terminal_output.append("Config saved via editor.")
             self._init_config()
 
     def _get_user_home(self):

@@ -69,9 +69,9 @@ class PipeWireTab(QWidget):
         self.rate_reset.clicked.connect(lambda: self._set_metadata('clock.force-rate', '0'))
         self.rate_refresh = QPushButton('\u21bb')
         self.rate_refresh.clicked.connect(self._refresh_rate)
-        self.rate_status = QLabel('Aktuell: \u2014')
+        self.rate_status = QLabel('Current: \u2014')
         self.rate_status.setStyleSheet('color: #aaa;')
-        g.addWidget(QLabel('Samplerate:'), 0, 0)
+        g.addWidget(QLabel('Sample Rate:'), 0, 0)
         g.addWidget(self.rate_combo, 0, 1)
         g.addWidget(self.rate_apply, 0, 2)
         g.addWidget(self.rate_reset, 0, 3)
@@ -92,7 +92,7 @@ class PipeWireTab(QWidget):
         self.q_reset.clicked.connect(lambda: self._set_metadata('clock.force-quantum', '0'))
         self.q_refresh = QPushButton('\u21bb')
         self.q_refresh.clicked.connect(self._refresh_quantum)
-        self.q_status = QLabel('Aktuell: \u2014')
+        self.q_status = QLabel('Current: \u2014')
         self.q_status.setStyleSheet('color: #aaa;')
         g.addWidget(QLabel('Quantum:'), 0, 0)
         g.addWidget(self.q_combo, 0, 1)
@@ -112,7 +112,7 @@ class PipeWireTab(QWidget):
         self.latency_label = QLabel('\u2014')
         self.latency_label.setStyleSheet('font-size: 20px; font-weight: bold; color: #e0e0e0;')
         lat_v.addWidget(self.latency_label)
-        lat_v.addWidget(QLabel('Quantum [Samples] = Latenz [ms] \u00d7 Rate [kHz]'))
+        lat_v.addWidget(QLabel('Quantum [Samples] = Latency [ms] \u00d7 Rate [kHz]'))
         sh.addLayout(lat_v)
         sh.addStretch()
 
@@ -122,9 +122,9 @@ class PipeWireTab(QWidget):
         self.xruns_label.setStyleSheet('font-size: 20px; font-weight: bold; color: #e0e0e0;')
         self.xruns_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.xruns_label.mousePressEvent = lambda e: self._reset_xruns()
-        self.xruns_label.setToolTip('Klicken zum Zur\u00fccksetzen')
+        self.xruns_label.setToolTip('Click to reset')
         xv.addWidget(self.xruns_label)
-        xv.addWidget(QLabel('klick \u2192 reset'))
+        xv.addWidget(QLabel('click \u2192 reset'))
         sh.addLayout(xv)
         sh.addStretch()
 
@@ -143,7 +143,7 @@ class PipeWireTab(QWidget):
         layout.addWidget(sg)
 
         # ── Tabelle ──
-        tg = QGroupBox('Nodes (alle 2s)')
+        tg = QGroupBox('Nodes (every 2s)')
         tl = QVBoxLayout(tg)
         self.table = QTableWidget(0, 11)
         self.table.setHorizontalHeaderLabels([
@@ -218,7 +218,7 @@ class PipeWireTab(QWidget):
                 )
                 out = r.stdout or r.stderr or ''
             except Exception:
-                self.rate_status.setText('Aktuell: \u2014 (Fehler)')
+                self.rate_status.setText('Current: \u2014 (Error)')
                 return
         # Fallback: clock.rate wenn force-rate leer/0
         if not out or 'value:\'0\'' in out or 'value:0' in out:
@@ -246,21 +246,21 @@ class PipeWireTab(QWidget):
                 effective = self._get_effective_rate()
                 if effective and effective > 0:
                     self.rate_combo.setCurrentText(str(effective))
-                    self.rate_status.setText(f'Effektiv: {effective} Hz (Metadata: Default)')
+                    self.rate_status.setText(f'Effective: {effective} Hz (Metadata: Default)')
                     self._current_rate = effective
                 else:
                     self.rate_combo.setCurrentText('')
-                    self.rate_status.setText('Aktuell: Default (nicht gesetzt)')
+                    self.rate_status.setText('Current: Default (not set)')
             else:
                 idx = self.rate_combo.findData(val)
                 if idx >= 0:
                     self.rate_combo.setCurrentIndex(idx)
                 else:
                     self.rate_combo.setCurrentText(str(val))
-                self.rate_status.setText(f'Aktuell: {val} Hz')
+                self.rate_status.setText(f'Current: {val} Hz')
         else:
             preview = (out or '')[:100].strip().replace('\n', ' ')
-            self.rate_status.setText(f'Kein Wert: {preview}')
+            self.rate_status.setText(f'No value: {preview}')
         self._update_latency()
 
     def _refresh_quantum(self):
@@ -277,7 +277,7 @@ class PipeWireTab(QWidget):
                 )
                 out = r.stdout or r.stderr or ''
             except Exception:
-                self.q_status.setText('Aktuell: \u2014 (Fehler)')
+                self.q_status.setText('Current: \u2014 (Error)')
                 return
         # Narrensichere Extraktion: Alle Zahlen finden, die letzte nach 'value:' nehmen
         val = None
@@ -299,21 +299,21 @@ class PipeWireTab(QWidget):
                 effective = self._get_effective_quantum()
                 if effective and effective > 0:
                     self.q_combo.setCurrentText(str(effective))
-                    self.q_status.setText(f'Effektiv: {effective} Samples (Metadata: Default)')
+                    self.q_status.setText(f'Effective: {effective} Samples (Metadata: Default)')
                     self._current_quantum = effective
                 else:
                     self.q_combo.setCurrentText('')
-                    self.q_status.setText('Aktuell: Default (nicht gesetzt)')
+                    self.q_status.setText('Current: Default (not set)')
             else:
                 idx = self.q_combo.findData(val)
                 if idx >= 0:
                     self.q_combo.setCurrentIndex(idx)
                 else:
                     self.q_combo.setCurrentText(str(val))
-                self.q_status.setText(f'Aktuell: {val} Samples')
+                self.q_status.setText(f'Current: {val} Samples')
         else:
             preview = (out or '')[:100].strip().replace('\n', ' ')
-            self.q_status.setText(f'Kein Wert: {preview}')
+            self.q_status.setText(f'No value: {preview}')
         self._update_latency()
         self._update_latency()
 
@@ -323,7 +323,7 @@ class PipeWireTab(QWidget):
             khz = self._current_rate / 1000
             self.latency_label.setText(f'{ms:.1f} ms')
             self.latency_label.setToolTip(
-                f'Quantum [Samples] = Latenz [ms] \u00d7 Abtastrate [kHz]\n'
+                f'Quantum [Samples] = Latency [ms] \u00d7 Sample Rate [kHz]\n'
                 f'{self._current_quantum} = {ms:.1f}ms \u00d7 {khz}kHz'
             )
         else:
@@ -348,7 +348,7 @@ class PipeWireTab(QWidget):
             out = self._run([_PW_TOP, '-b', '-n', '1'])
         if not out or not out.strip():
             self.table.setRowCount(1)
-            self.table.setItem(0, 0, QTableWidgetItem('Keine pw-top-Daten'))
+            self.table.setItem(0, 0, QTableWidgetItem('No pw-top data'))
             return
 
         lines = out.split('\n')
@@ -384,7 +384,7 @@ class PipeWireTab(QWidget):
 
         if not nodes:
             self.table.setRowCount(1)
-            self.table.setItem(0, 0, QTableWidgetItem('Keine Nodes gefunden'))
+            self.table.setItem(0, 0, QTableWidgetItem('No nodes found'))
             return
 
         tree = self._build_tree(nodes)
@@ -597,7 +597,7 @@ class PipeWireTab(QWidget):
             self._current_rate = meta_val
             idx = self.rate_combo.findData(meta_val)
             self.rate_combo.setCurrentIndex(idx) if idx >= 0 else self.rate_combo.setCurrentText(str(meta_val))
-            self.rate_status.setText(f'Aktuell: {meta_val} Hz')
+            self.rate_status.setText(f'Current: {meta_val} Hz')
             self._update_latency()
             return
         effective = self._get_effective_rate()
@@ -605,7 +605,7 @@ class PipeWireTab(QWidget):
             self._current_rate = effective
             idx = self.rate_combo.findData(effective)
             self.rate_combo.setCurrentIndex(idx) if idx >= 0 else self.rate_combo.setCurrentText(str(effective))
-            self.rate_status.setText(f'Effektiv: {effective} Hz')
+            self.rate_status.setText(f'Effective: {effective} Hz')
             self._update_latency()
 
     def _update_quantum_from_pwtop(self):
@@ -614,14 +614,14 @@ class PipeWireTab(QWidget):
             self._current_quantum = meta_val
             idx = self.q_combo.findData(meta_val)
             self.q_combo.setCurrentIndex(idx) if idx >= 0 else self.q_combo.setCurrentText(str(meta_val))
-            self.q_status.setText(f'Aktuell: {meta_val} Samples')
+            self.q_status.setText(f'Current: {meta_val} Samples')
             self._update_latency()
             return
         effective = self._get_effective_quantum()
         if effective > 0:
             self._current_quantum = effective
             self.q_combo.setCurrentText(str(effective))
-            self.q_status.setText(f'Effektiv: {effective} Samples')
+            self.q_status.setText(f'Effective: {effective} Samples')
             self._update_latency()
 
     def _read_metadata_value(self, key):
@@ -687,7 +687,7 @@ class PipeWireTab(QWidget):
             # Keine aktiven Nodes → Default anzeigen
             self._current_quantum = 0
             self.q_combo.setCurrentText('')
-            self.q_status.setText('Aktuell: \u2014 (keine aktiven Nodes)')
+            self.q_status.setText('Current: \u2014 (no active nodes)')
             self._update_latency()
             return
         # Quantum vom ersten Running-Node nehmen
@@ -701,13 +701,13 @@ class PipeWireTab(QWidget):
                         self.q_combo.setCurrentIndex(idx)
                     else:
                         self.q_combo.setCurrentText(str(q))
-                    self.q_status.setText(f'Aktuell: {q} Samples')
+                    self.q_status.setText(f'Current: {q} Samples')
                     self._update_latency()
                     return
             except ValueError:
                 continue
         # Fallback: kein brauchbares Quantum gefunden
-        self.q_status.setText('Aktuell: \u2014 (kein Quantum)')
+        self.q_status.setText('Current: \u2014 (no quantum)')
         display = max(0, total_err - self._xruns_offset)
         self.xruns_label.setText(str(display))
         self.xruns_label.setStyleSheet(
