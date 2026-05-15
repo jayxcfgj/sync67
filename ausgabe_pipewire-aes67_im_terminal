@@ -1,0 +1,159 @@
+$ pipewire-aes67 -v
+[I][09:12:08.310387] pw.conf      | [          conf.c:  415 conf_load()] 0x57cdf0d69a60: loaded config '/home/jacob/.config/pipewire/pipewire-aes67.conf' with 4 items
+[I][09:12:08.310471] pw.conf      | [          conf.c: 1111 pw_conf_section_for_each()] handle config '/home/jacob/.config/pipewire/pipewire-aes67.conf' section 'context.properties'
+[I][09:12:08.310506] pw.context   | [       context.c:  473 pw_context_new()] 0x57cdf0d681e0: parsed 0 context.properties items
+[I][09:12:08.310571] pw.context   | [       context.c:  272 setup_data_loops()] created data loop 'data-loop.0'
+[I][09:12:08.310575] pw.context   | [       context.c:  275 setup_data_loops()] created 1 data-loops
+[I][09:12:08.311385] pw.conf      | [          conf.c: 1111 pw_conf_section_for_each()] handle config '/home/jacob/.config/pipewire/pipewire-aes67.conf' section 'context.spa-libs'
+[I][09:12:08.311414] pw.context   | [       context.c:  567 pw_context_new()] 0x57cdf0d681e0: parsed 1 context.spa-libs items
+[I][09:12:08.311418] pw.conf      | [          conf.c: 1111 pw_conf_section_for_each()] handle config '/home/jacob/.config/pipewire/pipewire-aes67.conf' section 'context.modules'
+[I][09:12:08.311428] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-rt args:{
+            nice.level   = -11
+            rlimits.enabled = true
+            rtkit.enabled = false
+            #rt.prio      = 83
+            #rt.time.soft = -1
+            #rt.time.hard = -1
+        }
+[I][09:12:08.311536] mod.rt       | [     module-rt.c:  627 set_nice()] main thread nice level set to -11
+[I][09:12:08.311543] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-rt
+[I][09:12:08.311547] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-protocol-native args:(null)
+[I][09:12:08.311868] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-protocol-native
+[I][09:12:08.311874] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-client-node args:(null)
+[I][09:12:08.312007] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-client-node
+[I][09:12:08.312012] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-spa-node-factory args:(null)
+[I][09:12:08.312076] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-spa-node-factory
+[I][09:12:08.312081] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-adapter args:(null)
+[I][09:12:08.312164] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-adapter
+[I][09:12:08.312173] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-rtp-sap args:{
+            ### Please select the interface here
+            local.ifname = enx6c6e0709c56d
+            sap.ip = 239.255.255.255
+            sap.port = 9875
+            net.ttl = 32
+            net.loop = false
+            # If you use another PTPv2 daemon supporting management
+            # messages over a UNIX socket, specify its path here
+            ptp.management-socket = "/var/run/ptp4lro"
+
+            stream.rules = [
+                {
+                    matches = [
+                        {
+                            rtp.session = "~.*"
+                        }
+                    ]
+                    actions = {
+                        create-stream = {
+                            node.virtual = false
+                            media.class = "Audio/Source"
+                            device.api = aes67
+                       ... (truncated)
+[I][09:12:08.312286] mod.rtp-sap  | [module-rtp-sap.c: 2114 pipewire__module_init()] using IGMP deadline of 45 second(s)
+[I][09:12:08.312376] mod.protocol-native | [  local-socket.c:   72 try_connect()] connecting to 'pipewire-0' runtime_dir:/run/user/1000
+[I][09:12:08.312401] mod.rtp-sap  | [module-rtp-sap.c: 1803 start_sap()] starting SAP send timer
+[I][09:12:08.312418] mod.rtp-sap  | [module-rtp-sap.c:  519 make_recv_socket()] join IPv4 group: 239.255.255.255 iface:3
+[I][09:12:08.312445] mod.rtp-sap  | [module-rtp-sap.c:  576 make_recv_socket()] receiver socket up and running
+[I][09:12:08.312449] mod.rtp-sap  | [module-rtp-sap.c: 1859 start_sap()] starting SAP listener on 239.255.255.255
+[I][09:12:08.312456] mod.rtp-sap  | [module-rtp-sap.c: 2182 pipewire__module_init()] Successfully loaded module-rtp-sap
+[I][09:12:08.312460] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-rtp-sap
+[I][09:12:08.312473] pw.module    | [   impl-module.c:  157 pw_context_load_module()] 0x57cdf0d681e0: name:libpipewire-module-rtp-sink args:{
+            ### Please select the interface here
+            local.ifname = enx6c6e0709c56d
+            ### If you want to create multiple output streams, please copy the whole
+            ### module-rtp-sink block, but change this multicast IP to another unused
+            ### one keeping 239.69.x.x range unless you know you need another one
+            destination.ip = 239.69.150.244
+            destination.port = 5004
+            net.mtu = 1280
+            net.ttl = 32
+            net.loop = false
+            # These should typically be equal
+            # You can customize packet length, but 1 ms should work for every device
+            # Consult receiver documentation to ensure it supports the value you set
+            sess.min-ptime = 1
+            sess.max-ptime = 1
+            ### Please change this, especially if you create multi... (truncated)
+[I][09:12:08.312679] mod.protocol-native | [  local-socket.c:   72 try_connect()] connecting to 'pipewire-0' runtime_dir:/run/user/1000
+[I][09:12:08.312714] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'(null)' class:'(null)'
+[I][09:12:08.312720] pw.context   | [       context.c:  287 data_loop_start()] starting data loop data-loop.0
+[I][09:12:08.312813] mod.rt       | [     module-rt.c:  682 acquire_rt_sched()] acquired realtime priority 83 for thread 0x770b5bda26c0
+[I][09:12:08.312837] spa.loop     | [          loop.c:  264 loop_create_queue()] 0x57cdf0d6efd8 created queue 0x57cdf0dae820 idx:0 0x770b5d072740
+[I][09:12:08.312843] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705217832238
+[I][09:12:08.312896] mod.rtp-sink | [         audio.c:  740 setup_ptp_sender()] AES67 driver group not specified, no separate sender configured
+[I][09:12:08.312963] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'(null)' class:'(null)'
+[I][09:12:08.312970] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705218082173
+[I][09:12:08.312976] pw.context   | [       context.c:  828 pw_context_release_loop()] release name:'data-loop.0' class:'data.rt' last_used:2705218082173
+[I][09:12:08.312981] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'data-loop.0' class:'(null)'
+[I][09:12:08.312985] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705218097603
+[I][09:12:08.313204] spa.audioadapter | [  audioadapter.c: 2192 impl_init()] 0x57cdf0dbd928: loaded converter audio.convert, hnd 0x770b5b476010, convert 0x770b5b476028
+[I][09:12:08.313215] spa.audioadapter | [  audioadapter.c: 1253 follower_convert_port_info()] new EnumFormat from converter
+[I][09:12:08.313223] pw.stream    | [        stream.c:  903 parse_latency()] stream 0x57cdf0db8420: set output/input latency 0,000000-0,000000 0-0 0-0
+[I][09:12:08.313231] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'data-loop.0' class:'(null)'
+[I][09:12:08.313235] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705218347768
+[I][09:12:08.313272] pw.node      | [     impl-node.c: 1190 check_properties()] 0x57cdf0dcf190: group '(null)'->'pipewire.ptp0'
+[I][09:12:08.313277] pw.node      | [     impl-node.c: 1217 check_properties()] 0x57cdf0dcf190: sync group '(null)'->'group.sync.0'
+[I][09:12:08.313288] pw.node      | [     impl-node.c: 1273 check_properties()] (rtp-sink-0) latency:0/0 -> 96/48000
+[I][09:12:08.313293] pw.node      | [     impl-node.c: 1304 check_properties()] (rtp-sink-0) rate:0/0 -> 1/48000
+[I][09:12:08.313314] pw.node      | [     impl-node.c:  503 node_update_state()] (rtp-sink-0) creating -> suspended
+[I][09:12:08.313366] mod.rtp-sink | [module-rtp-sink.:  680 pipewire__module_init()] Successfully loaded module-rtp-sink
+[I][09:12:08.313370] pw.conf      | [          conf.c:  610 load_module()] 0x57cdf0d681e0: loaded module libpipewire-module-rtp-sink
+[I][09:12:08.313376] pw.context   | [       context.c:  571 pw_context_new()] 0x57cdf0d681e0: parsed 7 context.modules items
+[I][09:12:08.313382] pw.conf      | [          conf.c: 1111 pw_conf_section_for_each()] handle config '/home/jacob/.config/pipewire/pipewire-aes67.conf' section 'context.objects'
+[I][09:12:08.313397] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'(null)' class:'(null)'
+[I][09:12:08.313401] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705218513401
+[I][09:12:08.313405] pw.context   | [       context.c:  828 pw_context_release_loop()] release name:'data-loop.0' class:'data.rt' last_used:2705218513401
+[I][09:12:08.313420] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'data-loop.0' class:'(null)'
+[I][09:12:08.313424] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705218536282
+[I][09:12:08.313449] spa.driver   | [   node-driver.c:  761 parse_clock_device()] failed to open clock device '/dev/ptp0': Keine Berechtigung
+[I][09:12:08.313516] spa.driver   | [   node-driver.c:  783 parse_clock_interface()] failed to open clock device '/dev/ptp0' for interface 'enx6c6e0709c56d': Keine Berechtigung
+[I][09:12:08.313525] pw.context   | [       context.c:  806 pw_context_acquire_loop()] 0x57cdf0d681e0: looking for name:'data-loop.0' class:'(null)'
+[I][09:12:08.313529] pw.context   | [       context.c:  782 acquire_data_loop()] 0x57cdf0d681e0: using name:'data-loop.0' class:'data.rt' last_used:2705218641774
+[I][09:12:08.313553] pw.node      | [     impl-node.c: 1190 check_properties()] 0x57cdf0dd58a0: group '(null)'->'pipewire.ptp0'
+[I][09:12:08.313557] pw.node      | [     impl-node.c: 1217 check_properties()] 0x57cdf0dd58a0: sync group '(null)'->'group.sync.0'
+[I][09:12:08.313573] pw.node      | [     impl-node.c:  503 node_update_state()] (PTP0-Driver-12) creating -> suspended
+[I][09:12:08.313578] pw.context   | [       context.c: 1448 pw_context_recalc_graph()] 0x57cdf0d681e0: busy:0 reason:register active node
+[I][09:12:08.313627] mod.protocol-native | [  local-socket.c:   72 try_connect()] connecting to 'pipewire-0' runtime_dir:/run/user/1000
+[I][09:12:08.313656] pw.context   | [       context.c:  576 pw_context_new()] 0x57cdf0d681e0: parsed 1 context.objects items
+[I][09:12:08.313660] pw.context   | [       context.c:  579 pw_context_new()] 0x57cdf0d681e0: parsed 0 context.exec items
+[I][09:12:08.313670] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:log.level type: value:3
+[I][09:12:08.313675] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.rate type: value:48000
+[I][09:12:08.313679] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.allowed-rates type: value:[ 48000 ]
+[I][09:12:08.313684] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.quantum type: value:1024
+[I][09:12:08.313688] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.min-quantum type: value:32
+[I][09:12:08.313693] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.max-quantum type: value:2048
+[I][09:12:08.313696] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.force-quantum type: value:0
+[I][09:12:08.313702] pw.metadata  | [ impl-metadata.c:  186 impl_set_property()] 0x57cdf0dd1dd0: add id:0 key:clock.force-rate type: value:0
+[I][09:12:08.313708] default      | [      pipewire.c:  129 main()] start main loop
+[I][09:12:08.314501] mod.rtp-sap  | [module-rtp-sap.c: 1147 session_new_announce()] created new session for node:89
+[E][09:12:08.314518] mod.rtp-sap  | [module-rtp-sap.c: 1233 session_new_announce()] Failed to create SDP: Das Argument ist ungültig
+[W][09:12:08.314531] mod.rtp-sap  | [module-rtp-sap.c:  891 send_sap()] SIOCGIFADDR enx6c6e0709c56d failed: Die angeforderte Adresse kann nicht zugewiesen werden
+[I][09:12:08.314538] mod.rtp-sap  | [module-rtp-sap.c:  898 send_sap()] interface enx6c6e0709c56d IP: 0.0.0.0
+[I][09:12:08.314563] mod.rtp-sap  | [module-rtp-sap.c:  474 make_send_socket()] sender socket up and running
+[I][09:12:08.314701] pw.node      | [     impl-node.c:  503 node_update_state()] (PTP0-Driver-92) suspended -> running
+[I][09:12:08.317225] pw.context   | [       context.c: 1448 pw_context_recalc_graph()] 0x57cdf0d681e0: busy:0 reason:node flags changed
+[I][09:12:08.318852] spa.audioadapter | [  audioadapter.c:  511 negotiate_buffers()] 0x57cdf0dbd928: buffers:1, blocks:1, size:73728, stride:6 align:16 0:0
+[I][09:12:08.318932] spa.audioconvert | [  audioconvert.c: 2074 setup_in_convert()] 0x770b5b476010: Spa:Enum:AudioFormat:F32P/2@48000->Spa:Enum:AudioFormat:F32P/2@48000
+[I][09:12:08.318951] spa.audioconvert | [  audioconvert.c: 1275 ensure_tmp()] resize ports 0 -> 2
+[I][09:12:08.318961] spa.audioconvert | [  audioconvert.c: 2243 setup_channelmix()] in  FL FR (0000000000000018)
+[I][09:12:08.318967] spa.audioconvert | [  audioconvert.c: 2245 setup_channelmix()] out FL FR (0000000000000018)
+[I][09:12:08.318971] spa.audioconvert | [  audioconvert.c: 2248 setup_channelmix()] 0x770b5b476010: Spa:Enum:AudioFormat:F32P/2@48000->Spa:Enum:AudioFormat:F32P/2@48000 00000018:00000018
+[I][09:12:08.318997][channelmix-ops.c:  174 match_mix()] matched channel 1 (1,000000)
+[I][09:12:08.319002][channelmix-ops.c:  174 match_mix()] matched channel 2 (1,000000)
+[I][09:12:08.319004][channelmix-ops.c:  265 make_matrix()] unassigned downmix 00000000 00000000
+[I][09:12:08.319009][channelmix-ops.c:  505 make_matrix()] unassigned upmix 00000000 lfe:0,000000
+[I][09:12:08.319013][channelmix-ops.c:  661 make_matrix()]      FL    FR    
+[I][09:12:08.319017][channelmix-ops.c:  663 make_matrix()] FL   1,000          1,000000
+[I][09:12:08.319026][channelmix-ops.c:  663 make_matrix()] FR         1,000    1,000000
+[I][09:12:08.319034] spa.audioconvert | [  audioconvert.c: 2292 setup_resample()] 0x770b5b476010: Spa:Enum:AudioFormat:F32P/2@48000->Spa:Enum:AudioFormat:F32P/2@48000
+[I][09:12:08.319274] spa.resample | [resample-native.:  570 resample_native_init()] native 0x770b5b4acd70: c:0,870000 q:4 w:0 in:48000 out:48000 gcd:48000 n_taps:56 n_phases:256 features:0007cbdb:00010800
+[I][09:12:08.319279] spa.audioconvert | [  audioconvert.c: 2367 setup_out_convert()] 0x770b5b476010: Spa:Enum:AudioFormat:F32P/2@48000->Spa:Enum:AudioFormat:S24BE/2@48000
+[I][09:12:08.319286] spa.audioconvert | [  audioconvert.c: 1248 ensure_tmp()] resize tmp 0 -> 73728
+[I][09:12:08.321304] mod.rtp-sink | [        stream.c:  404 stream_start()] stream started
+[I][09:12:08.321316] pw.node      | [     impl-node.c:  503 node_update_state()] (rtp-sink-89) suspended -> running
+[I][09:12:08.321364] mod.rtp-sink | [         audio.c:  567 rtp_audio_process_capture()] (re)sync to timestamp:129850870 seq:57986 ts_offset:0 SSRC:1368374112
+[I][09:12:08.322686] pw.node      | [     impl-node.c: 1395 debug_xrun_graph()] (PTP0-Driver-92) graph xrun not-triggered (0 suppressed)
+[I][09:12:08.322693] pw.node      | [     impl-node.c: 1405 debug_xrun_graph()] (-92) xrun state:0x770b5d015008 pending:1/2 s:2705225132136 a:2705225134596 f:2705225135196 waiting:2460 process:600 status:triggered
+[I][09:12:13.312471] mod.rtp-sap  | [module-rtp-sap.c:  674 update_ts_refclk()] Local clock ID: IEEE1588-2008:6C-6E-07-FF-FE-09-C5-6D:0
+[I][09:12:13.312486] mod.rtp-sap  | [module-rtp-sap.c:  690 update_ts_refclk()] GM ID: IEEE1588-2008:6C-6E-07-FF-FE-09-C5-6D:0
+

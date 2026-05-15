@@ -85,12 +85,27 @@ class AES67Tab(QWidget):
     def start_aes67(self):
         try:
             self.terminal_output.clear()
-            self.terminal_output.append("Starting pipewire-aes67...")
+            self.terminal_output.append("Starting pipewire-aes67 (mit System-Clock)...")
 
             user_home = self._get_user_home()
             uid = int(os.getenv('SUDO_UID', str(os.getuid())))
             runtime_dir = f"/run/user/{uid}"
             bus_address = f"unix:path={runtime_dir}/bus"
+
+            # Create temp config that disables PHC access
+            # App läuft als root, kann /dev/ptp0 öffnen, aber PHC liefert Timestamp 0.
+            # System-User kriegt Permission denied → Fallback auf System-Clock (funktioniert).
+            orig_config = os.path.join(user_home, ".config/pipewire/pipewire-aes67.conf")
+            tmp_config = "/dev/shm/pipewire-aes67-override.conf"
+            with open(orig_config, "r") as f:
+                config_content = f.read()
+            # clock.interface auskommentieren → kein PHC-Zugriff → System-Clock wird verwendet
+            config_content = config_content.replace(
+                "            clock.interface = \"enx6c6e0709c56d\"",
+                "            #clock.interface = \"enx6c6e0709c56d\""
+            )
+            with open(tmp_config, "w") as f:
+                f.write(config_content)
 
             env = QProcessEnvironment.systemEnvironment()
             env.insert("HOME", user_home)
@@ -105,7 +120,7 @@ class AES67Tab(QWidget):
             self.process.readyReadStandardError.connect(self.handle_stderr)
             self.process.finished.connect(self.process_finished)
 
-            self.process.start("pipewire-aes67")
+            self.process.start("pipewire-aes67", ["-c", tmp_config, "-v"])
             self.is_running = True
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
