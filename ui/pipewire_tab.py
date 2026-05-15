@@ -47,6 +47,7 @@ class PipeWireTab(QWidget):
         self._xruns_offset = 0
         self._current_rate = 0
         self._current_quantum = 0
+        self._last_nodes = []
         self.init_ui()
         self._timer.start(2000)
         QTimer.singleShot(300, self._update_all)
@@ -63,9 +64,9 @@ class PipeWireTab(QWidget):
         for v in (48000, 96000, 192000):
             self.rate_combo.addItem(str(v), v)
         self.rate_apply = QPushButton('Apply')
-        self.rate_apply.clicked.connect(lambda: self._set_metadata('clock.rate', self.rate_combo.currentText()))
+        self.rate_apply.clicked.connect(lambda: self._set_metadata('clock.force-rate', self.rate_combo.currentText()))
         self.rate_reset = QPushButton('Reset')
-        self.rate_reset.clicked.connect(lambda: self._set_metadata('clock.rate', '0'))
+        self.rate_reset.clicked.connect(lambda: self._set_metadata('clock.force-rate', '0'))
         self.rate_refresh = QPushButton('\u21bb')
         self.rate_refresh.clicked.connect(self._refresh_rate)
         self.rate_status = QLabel('Aktuell: \u2014')
@@ -86,9 +87,9 @@ class PipeWireTab(QWidget):
             self.q_combo.addItem(str(v), v)
         self.q_combo.setEditable(True)
         self.q_apply = QPushButton('Apply')
-        self.q_apply.clicked.connect(lambda: self._set_metadata('clock.quantum', self.q_combo.currentText()))
+        self.q_apply.clicked.connect(lambda: self._set_metadata('clock.force-quantum', self.q_combo.currentText()))
         self.q_reset = QPushButton('Reset')
-        self.q_reset.clicked.connect(lambda: self._set_metadata('clock.quantum', '0'))
+        self.q_reset.clicked.connect(lambda: self._set_metadata('clock.force-quantum', '0'))
         self.q_refresh = QPushButton('\u21bb')
         self.q_refresh.clicked.connect(self._refresh_quantum)
         self.q_status = QLabel('Aktuell: \u2014')
@@ -182,26 +183,41 @@ class PipeWireTab(QWidget):
 
     def _set_metadata(self, key, value):
         self._run([_PW_META, '-n', 'settings', '0', key, str(value)])
-        QTimer.singleShot(200, self._refresh_rate if 'rate' in key else self._refresh_quantum)
+        if 'rate' in key:
+            self._refresh_rate()
+        else:
+            self._refresh_quantum()
 
     def _refresh_rate(self):
-        out = self._run([_PW_META, '-n', 'settings', '0', 'clock.rate'])
-        if out is None:
-            self.rate_status.setText('Aktuell: \u2014 (pw-metadata nicht gefunden)')
-            return
-        # Debug: Zeige Output (nützlich bei Fehlersuche)
-        debug_out = out[:200] if out else 'None'
+        key = 'clock.force-rate'
+        try:
+            out = self._run([_PW_META, '-n', 'settings', '0', key])
+        except Exception:
+            out = None
+        if out is None or not isinstance(out, str):
+            try:
+                r = subprocess.run(
+                    [_PW_META, '-n', 'settings', '0', key],
+                    capture_output=True, text=True, timeout=5
+                )
+                out = r.stdout or r.stderr or ''
+            except Exception:
+                self.rate_status.setText('Aktuell: \u2014 (Fehler)')
+                return
+        # Fallback: clock.rate wenn force-rate leer/0
+        if not out or 'value:\'0\'' in out or 'value:0' in out:
+            fb = self._run([_PW_META, '-n', 'settings', '0', 'clock.rate'])
+            if fb and 'value' in fb:
+                out = fb
         val = None
-        # Versuche verschiedene Regex-Formate
         for pat in [
-            r"key:'clock\.rate'.*?value:'(\d+)'",
-            r"clock\.rate[=\s]+(\d+)",
-            r"value:'(\d+)'",
-            r"value=(\d+)",
+            r"value[=:]'?(\d+)'?",
+            r"=\s*(\d+)\s*$",
             r"'(\d+)'",
-            r'(\d+)',
         ]:
-            m = re.search(pat, out, re.DOTALL) if out else None
+            if not out:
+                continue
+            m = re.search(pat, out, re.DOTALL)
             if m:
                 try:
                     val = int(m.group(1))
@@ -210,48 +226,79 @@ class PipeWireTab(QWidget):
                     continue
         if val is not None:
             self._current_rate = val
-            idx = self.rate_combo.findData(val)
-            if idx >= 0:
-                self.rate_combo.setCurrentIndex(idx)
+            if val == 0:
+                effective = self._get_effective_rate()
+                if effective and effective > 0:
+                    self.rate_combo.setCurrentText(str(effective))
+                    self.rate_status.setText(f'Effektiv: {effective} Hz (Metadata: Default)')
+                    self._current_rate = effective
+                else:
+                    self.rate_combo.setCurrentText('')
+                    self.rate_status.setText('Aktuell: Default (nicht gesetzt)')
             else:
-                self.rate_combo.setCurrentText(str(val))
-            self.rate_status.setText(f'Aktuell: {val} Hz')
+                idx = self.rate_combo.findData(val)
+                if idx >= 0:
+                    self.rate_combo.setCurrentIndex(idx)
+                else:
+                    self.rate_combo.setCurrentText(str(val))
+                self.rate_status.setText(f'Aktuell: {val} Hz')
         else:
-            self.rate_status.setText(f'Aktuell: \u2014 (kein Wert)')
+            preview = (out or '')[:100].strip().replace('\n', ' ')
+            self.rate_status.setText(f'Kein Wert: {preview}')
         self._update_latency()
 
     def _refresh_quantum(self):
-        out = self._run([_PW_META, '-n', 'settings', '0', 'clock.quantum'])
-        if out is None:
-            self.q_status.setText('Aktuell: \u2014 (pw-metadata nicht gefunden)')
-            return
-        debug_out = out[:200] if out else 'None'
+        key = 'clock.force-quantum'
+        try:
+            out = self._run([_PW_META, '-n', 'settings', '0', key])
+        except Exception:
+            out = None
+        if out is None or not isinstance(out, str):
+            try:
+                r = subprocess.run(
+                    [_PW_META, '-n', 'settings', '0', key],
+                    capture_output=True, text=True, timeout=5
+                )
+                out = r.stdout or r.stderr or ''
+            except Exception:
+                self.q_status.setText('Aktuell: \u2014 (Fehler)')
+                return
+        # Narrensichere Extraktion: Alle Zahlen finden, die letzte nach 'value:' nehmen
         val = None
-        for pat in [
-            r"key:'clock\.quantum'.*?value:'(\d+)'",
-            r"clock\.quantum[=\s]+(\d+)",
-            r"value:'(\d+)'",
-            r"value=(\d+)",
-            r"'(\d+)'",
-            r'(\d+)',
-        ]:
-            m = re.search(pat, out, re.DOTALL) if out else None
+        if out:
+            # Suche value:'Zahl' oder value=Zahl oder value:Zahl
+            m = re.search(r"value[=:]'?(\d+)'?", out)
             if m:
-                try:
-                    val = int(m.group(1))
-                    break
-                except ValueError:
-                    continue
+                val = int(m.group(1))
+            else:
+                # Fallback: letzte Zahl im Output (meist der Wert)
+                nums = re.findall(r'(\d+)', out)
+                if nums:
+                    # Die letzte Zahl vermeidet "metadata 32" und "id:0"
+                    val = int(nums[-1])
         if val is not None:
             self._current_quantum = val
-            idx = self.q_combo.findData(val)
-            if idx >= 0:
-                self.q_combo.setCurrentIndex(idx)
+            if val == 0:
+                # Metadata = 0 (Default) → effektiven Wert aus pw-top holen
+                effective = self._get_effective_quantum()
+                if effective and effective > 0:
+                    self.q_combo.setCurrentText(str(effective))
+                    self.q_status.setText(f'Effektiv: {effective} Samples (Metadata: Default)')
+                    self._current_quantum = effective
+                else:
+                    self.q_combo.setCurrentText('')
+                    self.q_status.setText('Aktuell: Default (nicht gesetzt)')
             else:
-                self.q_combo.setCurrentText(str(val))
-            self.q_status.setText(f'Aktuell: {val} Samples')
+                idx = self.q_combo.findData(val)
+                if idx >= 0:
+                    self.q_combo.setCurrentIndex(idx)
+                else:
+                    self.q_combo.setCurrentText(str(val))
+                self.q_status.setText(f'Aktuell: {val} Samples')
         else:
-            self.q_status.setText(f'Aktuell: \u2014 (kein Wert)')
+            preview = (out or '')[:100].strip().replace('\n', ' ')
+            self.q_status.setText(f'Kein Wert: {preview}')
+        self._update_latency()
         self._update_latency()
 
     def _update_latency(self):
@@ -275,8 +322,9 @@ class PipeWireTab(QWidget):
 
     def _update_all(self):
         self._refresh_rate()
-        self._refresh_quantum()
         self._fetch_pwtop()
+        self._update_rate_from_pwtop()
+        self._update_quantum_from_pwtop()
 
     def _fetch_pwtop(self):
         out = self._run([_PW_TOP, '-b', '-n', '2'])
@@ -325,6 +373,7 @@ class PipeWireTab(QWidget):
 
         tree = self._build_tree(nodes)
         self._fill_table(tree)
+        self._last_nodes = nodes
         self._update_status(nodes)
 
     def _parse_pwtop_line(self, line):
@@ -434,7 +483,7 @@ class PipeWireTab(QWidget):
             (node['quantum'], None),
             (node['format'], None),
             (node['channels'], None),
-            (node['dsp_str'], dc),
+            ('', None),
             (node['waiting'], None),
             (node['busy'], None),
             (node['xruns'], None),
@@ -447,17 +496,29 @@ class PipeWireTab(QWidget):
                 item.setForeground(QBrush(color))
             self.table.setItem(row, col, item)
 
-        # DSP-Balken
-        bar = QProgressBar()
-        bar.setRange(0, 100)
-        bar.setValue(int(round(dsp)))
-        bar.setTextVisible(False)
-        bar.setFixedHeight(14)
-        bar.setStyleSheet(f"""
+        # DSP-Balken + Prozentzahl nebeneinander
+        dsp_widget = QWidget()
+        dsp_layout = QHBoxLayout(dsp_widget)
+        dsp_layout.setContentsMargins(2, 0, 2, 0)
+        dsp_layout.setSpacing(3)
+
+        dsp_label = QLabel(node['dsp_str'])
+        dsp_label.setStyleSheet(f'color: {dc.name()}; font-weight: bold; font-size: 10px;')
+        dsp_label.setFixedWidth(38)
+
+        dsp_bar = QProgressBar()
+        dsp_bar.setRange(0, 100)
+        dsp_bar.setValue(int(round(dsp)))
+        dsp_bar.setTextVisible(False)
+        dsp_bar.setFixedHeight(12)
+        dsp_bar.setStyleSheet(f"""
             QProgressBar {{ background-color: #333; border: none; border-radius: 2px; }}
             QProgressBar::chunk {{ background-color: {dc.name()}; border-radius: 2px; }}
         """)
-        self.table.setCellWidget(row, 6, bar)
+
+        dsp_layout.addWidget(dsp_label)
+        dsp_layout.addWidget(dsp_bar, 1)
+        self.table.setCellWidget(row, 6, dsp_widget)
 
         return row + 1
 
@@ -510,6 +571,126 @@ class PipeWireTab(QWidget):
             except ValueError:
                 pass
         self._current_total_xruns = total_err
+
+    def _update_rate_from_pwtop(self):
+        """Timer-Update: Nur wenn Metadata=0 (Default), sonst Metadata-Wert anzeigen."""
+        meta_val = self._read_metadata_value('clock.rate')
+        if meta_val is not None and meta_val > 0:
+            # Metadata ist gesetzt → Metadata-Wert anzeigen
+            self._current_rate = meta_val
+            idx = self.rate_combo.findData(meta_val)
+            self.rate_combo.setCurrentIndex(idx) if idx >= 0 else self.rate_combo.setCurrentText(str(meta_val))
+            self.rate_status.setText(f'Aktuell: {meta_val} Hz')
+            self._update_latency()
+            return
+        effective = self._get_effective_rate()
+        if effective > 0:
+            self._current_rate = effective
+            idx = self.rate_combo.findData(effective)
+            self.rate_combo.setCurrentIndex(idx) if idx >= 0 else self.rate_combo.setCurrentText(str(effective))
+            self.rate_status.setText(f'Effektiv: {effective} Hz')
+            self._update_latency()
+
+    def _update_quantum_from_pwtop(self):
+        meta_val = self._read_metadata_value('clock.quantum')
+        if meta_val is not None and meta_val > 0:
+            self._current_quantum = meta_val
+            idx = self.q_combo.findData(meta_val)
+            self.q_combo.setCurrentIndex(idx) if idx >= 0 else self.q_combo.setCurrentText(str(meta_val))
+            self.q_status.setText(f'Aktuell: {meta_val} Samples')
+            self._update_latency()
+            return
+        effective = self._get_effective_quantum()
+        if effective > 0:
+            self._current_quantum = effective
+            self.q_combo.setCurrentText(str(effective))
+            self.q_status.setText(f'Effektiv: {effective} Samples')
+            self._update_latency()
+
+    def _read_metadata_value(self, key):
+        """Liest einen pw-metadata-Wert. Gibt int oder None zurück."""
+        # Für force-fähige Keys zuerst die force-Version versuchen
+        keys = [key]
+        if 'quantum' in key:
+            keys = ['clock.force-quantum', 'clock.quantum']
+        elif 'rate' in key:
+            keys = ['clock.force-rate', 'clock.rate']
+        for k in keys:
+            try:
+                out = self._run([_PW_META, '-n', 'settings', '0', k])
+            except Exception:
+                continue
+            if not out:
+                continue
+            m = re.search(r"value[=:]'?(\d+)'?", out)
+            if m:
+                return int(m.group(1))
+            nums = re.findall(r'(\d+)', out)
+            if nums:
+                return int(nums[-1])
+        return None
+
+    def _get_effective_rate(self):
+        if not hasattr(self, '_last_nodes') or not self._last_nodes:
+            return 0
+        for n in self._last_nodes:
+            if n['state'] == 'Running':
+                try:
+                    r = int(n['rate'])
+                    if r > 0:
+                        return r
+                except (ValueError, TypeError):
+                    continue
+        return 0
+
+    def _get_effective_quantum(self):
+        """Ermittelt das effektive Quantum aus den pw-top Nodes
+        (erstes Running-Node-Quantum wird genommen)."""
+        if not hasattr(self, '_last_nodes') or not self._last_nodes:
+            return 0
+        for n in self._last_nodes:
+            if n['state'] == 'Running':
+                try:
+                    q = int(n['quantum'])
+                    if q > 0:
+                        return q
+                except (ValueError, TypeError):
+                    continue
+        return 0
+
+    def _sync_quantum_from_nodes(self):
+        """Extrahiert die effektive Quantum-Einstellung aus den
+        aktuellen pw-top Nodes (statt aus pw-metadata).
+        Zeigt den Quantum-Wert des ersten Running-Nodes an.
+        """
+        if not hasattr(self, '_last_nodes') or not self._last_nodes:
+            return
+        running = [n for n in self._last_nodes if n['state'] == 'Running']
+        if not running:
+            # Keine aktiven Nodes → Default anzeigen
+            self._current_quantum = 0
+            self.q_combo.setCurrentText('')
+            self.q_status.setText('Aktuell: \u2014 (keine aktiven Nodes)')
+            self._update_latency()
+            return
+        # Quantum vom ersten Running-Node nehmen
+        for node in running:
+            try:
+                q = int(node['quantum'])
+                if q > 0:
+                    self._current_quantum = q
+                    idx = self.q_combo.findData(q)
+                    if idx >= 0:
+                        self.q_combo.setCurrentIndex(idx)
+                    else:
+                        self.q_combo.setCurrentText(str(q))
+                    self.q_status.setText(f'Aktuell: {q} Samples')
+                    self._update_latency()
+                    return
+            except ValueError:
+                continue
+        # Fallback: kein brauchbares Quantum gefunden
+        self.q_status.setText('Aktuell: \u2014 (kein Quantum)')
         display = max(0, total_err - self._xruns_offset)
         self.xruns_label.setText(str(display))
         self.xruns_label.setStyleSheet(
