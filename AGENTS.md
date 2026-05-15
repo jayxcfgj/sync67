@@ -27,30 +27,47 @@
 ## Aktueller Stand
 - Frühe Entwicklung / Proof-of-Concept-Phase
 - `main.py` ist der Anwendungseinstiegspunkt
-- PTP-Tab (MVP 0.1) vollständig implementiert mit:
-  * Netzwerkinterface-Dropdown (befüllt via `ip link show`)
-  * Settings-Dialog für ethtool/ip link Konfiguration (gro, gso, tso, sg, rx-usecs, multicast)
-  * START PTP Button → führt Konfigurationsbefehle aus, startet dann `ptp4l -i $IFACE -m -l 6 -H`
-  * STOP PTP Button → beendet ptp4l-Prozess
-  * Terminal-Ausgabebereich (schwarz/grün) für Befehlsausgaben und ptp4l-Logs
-  * Visuelle Ampel-Anzeige für PTP-Synchronisationsstabilität (grün/gelb/rot)
-  * Separate QProcess-Objekte für Konfigurationsbefehle und ptp4l
-  * sudo-Credential-Check via `sudo -n true` (User muss vorher `sudo -v` im Terminal ausführen)
-- AES67-Tab (MVP 0.2) implementiert mit:
-  * Start/Stop Buttons für `pipewire-aes67`
-  * Terminal-Ausgabebereich für Logs und Fehlermeldungen
-  * Config-Button zum Öffnen von `~/.config/pipewire/pipewire-aes67.conf`
-  * AES67 Config Editor Button → öffnet GUI-Editor mit 4 Tabs, ~40 Parametern
-  * Kein sudo erforderlich
-  * Wichtig: App läuft scheinbar als root (os.getuid() == 0). Daher müssen
-    `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` und `HOME` explizit auf
-    den User-Wert gesetzt werden (via `SUDO_UID` aus der Umgebung).
-    Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
-  * PHC-Problem (Timestamp 0 als root): gelöst via "System-Clock verwenden"
-    Checkbox im Config-Editor (PTP Clock Tab). Kein `/dev/shm`-Override mehr nötig.
-- Config-Editor (`core/aes67_config.py`, `core/aes67_config_meta.py`,
-  `ui/aes67_settings_dialog.py`): format-erhaltender SPA-Parser, 41 Parameter,
-  4 Tabs, RTP-Sink-Multi-Instanz, System-Clock-Checkbox, Deviation-Highlighting.
+- PTP-Tab (MVP 0.1) vollständig implementiert
+- AES67-Tab (MVP 0.2) vollständig implementiert mit:
+  * Start/Stop für `pipewire-aes67`
+  * Terminal-Ausgabe (schwarz/grün)
+  * Config-Button (xdg-open)
+  * AES67 Config Editor Button → GUI-Editor mit 4 Tabs, ~40 Parametern
+
+### Config Editor (`core/aes67_config.py`, `core/aes67_config_meta.py`, `ui/aes67_settings_dialog.py`)
+- Format-erhaltender SPA-Parser (Zeilenbasiert, Kommentare/Formatierung bleiben erhalten)
+- 40 Parameter in 4 Tabs (PTP Clock, RTP SAP Input, RTP Sink Output, Expert)
+- RTP-Sink-Multi-Instanz (Add/Remove Sinks mit QTabWidget)
+- System-Clock-Checkbox (kommentiert `clock.interface` aus → löst PHC-Timestamp-0-Problem als root)
+- Deviation-Highlighting (goldener linker Rand bei Abweichung vom Default)
+- Dunkles Theme (App-Level QPalette + gezielte Stylesheets, native SpinBox/ComboBox-Pfeile bleiben sichtbar)
+- Stream.rules Raw-Editor (SPA-Rohtext im Expert-Tab, Round-Trip-sicher)
+- Formatierung/Ausrichtung/Leerzeichen/Kommentare bleiben beim Speichern erhalten
+
+### Wichtige Implementation-Details
+- App läuft als root → `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME` via `SUDO_UID` setzen
+- Config-Parser (`AES67Config`): `_raw_lines[]` + `_data{}` + `_line_map[]` für format-erhaltendes set() mit Fallback-Zeilenscan
+- Pfade als Tupel (`('args', 'local.ifname')`) wegen Punkt-Tasten wie `clock.interface`
+- Regex `_SECTION_RE`: `context\.[\w\-]+` (Hyphen in `spa-libs`)
+- Regex `_KV_RE`: Negative-Lookahead `(?!\s*[\{\[])` unterscheidet `key = value` von `key = {`
+- `get_raw_block`/`set_raw_block` für Rohtext-Blöcke (stream.rules)
+
+### PipeWire Tab (MVP 0.3)
+- `ui/pipewire_tab.py`: Rate/Quantum-Steuerung via `pw-metadata`, pw-top Node-Tabelle
+- Sample-Rate-Dropdown: 48000, 96000, 192000 (kein 44100 – nicht AES67-konform)
+- Quantum-Dropdown: 16-8192 (Zweierpotenzen), editierbar
+- Status-Anzeige: Latenz (berechnet), Xruns (klickbar), DSP Load (ProgressBar)
+- Node-Tabelle mit Tree-Struktur: pw-top Output wird geparst (Fixed-Width), Parent-Child via `+` Prefix
+- Tabellen-Spalten: ID, Status (Running/Idle/Closed), Name, Quantum, Format, CH, DSP (Mini-Bar), Waiting, Busy, Xruns
+- Update-Intervall: 2s via QTimer
+- pw-top muss installiert sein, sonst leere Tabelle
+
+### Bekannte Einschränkungen
+- `context.spa-libs` wird geparst aber nicht im Editor angezeigt (wird nie verändert)
+- `node.channel-names` als MultilineWidget (Array-String-Konvertierung korrigiert aber nicht mit Sonderzeichen getestet)
+- `stream.rules` nur als Raw-Editor, kein strukturierter Rule-Editor
+- pw-top: Spalten-Parsing per Fixed-Width (abhängig vom pw-top Output-Format)
+- Xruns: lokaler Zähler, kein System-Reset möglich
 - Keine Build/Test/Lint-Konfiguration vorhanden
 
 ## Beim Hinzufügen von Features

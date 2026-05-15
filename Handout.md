@@ -138,17 +138,29 @@ Beispiel:
   * Trennung von UI und Systemlogik (UI → Service Layer → Systemprozess)
 - AES67 Tab vollständig funktional mit:
   * Start/Stop Buttons für `pipewire-aes67`
-  * Terminal-Ausgabebereich für Logs und Fehlermeldungen
-  * Config-Button zum Öffnen von `~/.config/pipewire/pipewire-aes67.conf`
-  * Kein sudo erforderlich
+  * Terminal-Ausgabebereich
+  * Config-Button zum Öffnen der Config-Datei im Editor
+  * **AES67 Config Editor**: GUI-Editor für alle ~40 Parameter der `pipewire-aes67.conf`
+    * 4 Tabs: PTP Clock, RTP SAP Input, RTP Sink Output, Expert
+    * Format-erhaltender SPA-Parser (Kommentare/Formatierung bleiben erhalten)
+    * RTP-Sink-Multi-Instanz (Add/Remove)
+    * System-Clock-Checkbox (PHC-Problem-Umgehung als root)
+    * Deviation-Highlighting bei Abweichung vom Default
+    * Dunkles Theme (Dark Mode)
+    * stream.rules Raw-Editor im Expert-Tab
   * Wichtig: App läuft scheinbar als root (os.getuid() == 0). Daher müssen
     `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` und `HOME` explizit auf
     den User-Wert gesetzt werden (via `SUDO_UID` aus der Umgebung).
     Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
-  * Da die App als root läuft, wird die PTP-Hardware-Clock (PHC) nicht
-    korrekt erkannt. Daher wird in einer temporären Config-Datei
-    (`/dev/shm/pipewire-aes67-override.conf`) `clock.interface` auskommentiert,
-    sodass die System-Clock statt des PHC verwendet wird.
+  * PHC-Problem (Timestamp 0 als root): gelöst via "System-Clock verwenden"
+    Checkbox im Config-Editor. Kein `/dev/shm`-Override mehr nötig.
+- PipeWire Tab (MVP 0.3) implementiert mit:
+  * Sample Rate und Quantum steuern/lesen via `pw-metadata`
+  * Latenz-Anzeige (berechnet aus Quantum/Rate)
+  * Xruns-Counter (klickbar zum Zurücksetzen)
+  * DSP Load mit farbigem ProgressBar
+  * Node-Tabelle mit Tree-Struktur (Parent-Child), aktualisiert via `pw-top` alle 2s
+  * Spalten: ID, Status, Name, Quantum, Format, CH, DSP, Waiting, Busy, Xruns
 
 ---
 
@@ -166,12 +178,18 @@ Beispiel:
 * PipeWire AES67 starten/stoppen
 * Live-Log anzeigen
 * Config-Datei öffnen
+* AES67 Config Editor (40 Parameter, 4 Tabs, Stream-Rules-Editor)
 
-## System Tab (MVP 0.3 – offen)
+## ✅ PipeWire Tab (MVP 0.3 – abgeschlossen)
 
-* pw-top Informationen anzeigen
-* Quantum anzeigen
-* XRuns anzeigen
+* Sample Rate steuern (Dropdown: 48000, 96000, 192000 – Apply/Reset/Refresh)
+* Quantum steuern (Dropdown 16-8192, editierbar – Apply/Reset/Refresh)
+* Latenz-Anzeige (berechnet aus Quantum × Rate, Tooltip mit Formel)
+* Xruns-Counter (klickbar zum Zurücksetzen)
+* DSP Load mit farbigem ProgressBar (grün/gelb/rot)
+* Node-Tabelle mit Tree-Struktur (Parent-Child via └─)
+  * Spalten: ID, Status (Running/Idle/Closed), Name, Quantum, Format, CH, DSP (Mini-Bar), Waiting, Busy, Xruns
+  * Aktualisiert alle 2s via pw-top
 
 ---
 
