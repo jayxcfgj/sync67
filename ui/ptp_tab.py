@@ -113,6 +113,19 @@ class PTPTab(QWidget):
                 self.interface_combo.addItem("Error loading interfaces")
         except Exception as e:
             self.interface_combo.addItem(f"Error: {str(e)}")
+        # Gespeichertes Interface wiederherstellen
+        settings = QSettings("sync67", "ptp_settings")
+        saved = settings.value("selected_interface", "", type=str)
+        if saved:
+            idx = self.interface_combo.findText(saved)
+            if idx >= 0:
+                self.interface_combo.setCurrentIndex(idx)
+        # Änderungen speichern
+        self.interface_combo.currentIndexChanged.connect(self._save_interface)
+
+    def _save_interface(self):
+        settings = QSettings("sync67", "ptp_settings")
+        settings.setValue("selected_interface", self.interface_combo.currentText())
 
     def open_settings(self):
         from ui.settings_dialog import SettingsDialog

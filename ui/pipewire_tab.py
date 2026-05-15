@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QGroupBox, QGridLayout, QProgressBar,
     QTableWidget, QTableWidgetItem
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QFont, QColor, QBrush
 
 _PW_TOP = '/usr/bin/pw-top'
@@ -145,13 +145,15 @@ class PipeWireTab(QWidget):
         # ── Tabelle ──
         tg = QGroupBox('Nodes (alle 2s)')
         tl = QVBoxLayout(tg)
-        self.table = QTableWidget(0, 10)
+        self.table = QTableWidget(0, 11)
         self.table.setHorizontalHeaderLabels([
             'ID', 'Status', 'Name', 'Quantum', 'Format', 'CH',
-            'DSP', 'Waiting', 'Busy', 'Xruns'
+            'DSP', 'Waiting', 'Busy', 'Xruns', 'Rate'
         ])
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setShowGrid(False)
@@ -160,7 +162,21 @@ class PipeWireTab(QWidget):
             QHeaderView::section { background-color: #2b2b2b; color: #aaa; padding: 4px 6px; border: none; border-bottom: 1px solid #444; font-weight: bold; font-size: 10px; }
         """)
         tl.addWidget(self.table)
+        # Spaltenbreiten speichern/wiederherstellen
+        settings = QSettings("sync67", "pipewire_tab")
+        saved_widths = settings.value("column_widths")
+        if saved_widths:
+            widths = [int(w) for w in saved_widths.split(',')]
+            for i, w in enumerate(widths):
+                if i < self.table.columnCount():
+                    self.table.setColumnWidth(i, w)
+        self.table.horizontalHeader().sectionResized.connect(self._save_column_widths)
         layout.addWidget(tg)
+
+    def _save_column_widths(self):
+        settings = QSettings("sync67", "pipewire_tab")
+        widths = ','.join(str(self.table.columnWidth(i)) for i in range(self.table.columnCount()))
+        settings.setValue("column_widths", widths)
 
     # ─── subprocess Helfer ───────────────────────────────────
 
@@ -487,6 +503,7 @@ class PipeWireTab(QWidget):
             (node['waiting'], None),
             (node['busy'], None),
             (node['xruns'], None),
+            (node['rate'], None),
         ]
 
         for col, (text, color) in enumerate(items):

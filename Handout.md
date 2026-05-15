@@ -154,13 +154,18 @@ Beispiel:
     Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
   * PHC-Problem (Timestamp 0 als root): gelöst via "System-Clock verwenden"
     Checkbox im Config-Editor. Kein `/dev/shm`-Override mehr nötig.
-- PipeWire Tab (MVP 0.3) implementiert mit:
+- PipeWire Tab (MVP 0.3) vollständig funktional mit:
   * Sample Rate und Quantum steuern/lesen via `pw-metadata`
-  * Latenz-Anzeige (berechnet aus Quantum/Rate)
+  * Apply setzt via `clock.force-rate` / `clock.force-quantum` → sofortige Wirkung auf Nodes
+  * Refresh zeigt Metadata-Wert, Reset zeigt effektiven Wert aus pw-top
+  * Timer-Updates (2s) respektieren gesetzte Metadata-Werte, sonst effektive Werte aus pw-top
+  * Latenz-Anzeige (berechnet aus Quantum/Rate, Tooltip mit Formel)
   * Xruns-Counter (klickbar zum Zurücksetzen)
-  * DSP Load mit farbigem ProgressBar
-  * Node-Tabelle mit Tree-Struktur (Parent-Child), aktualisiert via `pw-top` alle 2s
-  * Spalten: ID, Status, Name, Quantum, Format, CH, DSP, Waiting, Busy, Xruns
+  * DSP Load mit farbigem ProgressBar (grün <50%, gelb <80%, rot >=80%)
+  * Node-Tabelle mit Tree-Struktur (Parent-Child via └─), aktualisiert via `pw-top` alle 2s
+  * Spalten: ID, Status, Name, Quantum, Format, CH, DSP (Label + Mini-Bar), Waiting, Busy, Xruns, Rate
+  * Read-Only (kein Selection-Modus), Spaltenbreiten via QSettings gemerkt
+  * PTP-Interface-Auswahl via QSettings gemerkt
 
 ---
 
@@ -184,12 +189,14 @@ Beispiel:
 
 * Sample Rate steuern (Dropdown: 48000, 96000, 192000 – Apply/Reset/Refresh)
 * Quantum steuern (Dropdown 16-8192, editierbar – Apply/Reset/Refresh)
+* Setzen via `clock.force-rate` / `clock.force-quantum` → sofortige Wirkung
 * Latenz-Anzeige (berechnet aus Quantum × Rate, Tooltip mit Formel)
 * Xruns-Counter (klickbar zum Zurücksetzen)
 * DSP Load mit farbigem ProgressBar (grün/gelb/rot)
 * Node-Tabelle mit Tree-Struktur (Parent-Child via └─)
-  * Spalten: ID, Status (Running/Idle/Closed), Name, Quantum, Format, CH, DSP (Mini-Bar), Waiting, Busy, Xruns
-  * Aktualisiert alle 2s via pw-top
+  * Spalten: ID, Running, Name, Quantum, Format, CH, DSP (Label+Bar), Waiting, Busy, Xruns, Rate
+  * Read-Only, Spaltenbreiten via QSettings gemerkt
+  * Aktualisiert alle 2s via pw-top (2. Iteration für Running-States)
 
 ---
 
