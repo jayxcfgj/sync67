@@ -4,14 +4,30 @@ from PyQt6.QtCore import QProcess, QProcessEnvironment
 from PyQt6.QtGui import QFont
 import os
 import pwd
+import shutil
 import traceback
+
+from core.aes67_config import AES67Config
+
 
 class AES67Tab(QWidget):
     def __init__(self):
         super().__init__()
-        self.init_ui()
+        self.config = None
         self.process = None
         self.is_running = False
+        self._init_config()
+        self.init_ui()
+
+    def _init_config(self):
+        user_home = self._get_user_home()
+        self.config_path = os.path.join(user_home, ".config/pipewire/pipewire-aes67.conf")
+        self.default_config_path = "/usr/share/pipewire/pipewire-aes67.conf"
+        try:
+            self.config = AES67Config()
+            self.config.load(self.config_path)
+        except FileNotFoundError:
+            self.config = None
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -61,6 +77,11 @@ class AES67Tab(QWidget):
         self.config_btn = QPushButton("Config öffnen")
         self.config_btn.clicked.connect(self.open_config)
         config_layout.addWidget(self.config_btn)
+
+        self.editor_btn = QPushButton("AES67 Config Editor")
+        self.editor_btn.clicked.connect(self.open_config_editor)
+        config_layout.addWidget(self.editor_btn)
+
         config_layout.addStretch()
         config_group.setLayout(config_layout)
 
@@ -85,34 +106,53 @@ class AES67Tab(QWidget):
     def start_aes67(self):
         try:
             self.terminal_output.clear()
-            self.terminal_output.append("Starting pipewire-aes67 (mit System-Clock)...")
 
             user_home = self._get_user_home()
             uid = int(os.getenv('SUDO_UID', str(os.getuid())))
             runtime_dir = f"/run/user/{uid}"
             bus_address = f"unix:path={runtime_dir}/bus"
 
-            # Create temp config that disables PHC access
-            # App läuft als root, kann /dev/ptp0 öffnen, aber PHC liefert Timestamp 0.
-            # System-User kriegt Permission denied → Fallback auf System-Clock (funktioniert).
-            orig_config = os.path.join(user_home, ".config/pipewire/pipewire-aes67.conf")
-            tmp_config = "/dev/shm/pipewire-aes67-override.conf"
-            with open(orig_config, "r") as f:
-                config_content = f.read()
-            # clock.interface auskommentieren → kein PHC-Zugriff → System-Clock wird verwendet
-            config_content = config_content.replace(
-                "            clock.interface = \"enx6c6e0709c56d\"",
-                "            #clock.interface = \"enx6c6e0709c56d\""
-            )
-            with open(tmp_config, "w") as f:
-                f.write(config_content)
+            # Config existence check → copy default if missing
+            if not os.path.exists(self.config_path):
+                if os.path.exists(self.default_config_path):
+                    shutil.copy(self.default_config_path, self.config_path)
+                    self.terminal_output.append(
+                        "Keine User-Config gefunden. Default kopiert nach:\n"
+                        f"  {self.config_path}"
+                    )
+                else:
+                    self.terminal_output.append(
+                        "FEHLER: Weder User-Config noch Default-Config gefunden."
+                    )
+                    return
+                self._init_config()
+
+            # Use the user config directly (editor handles any overrides)
+            use_config = self.config_path
+
+            # Check system-clock override in config
+            if self.config:
+                clock_intf = self.config.get(
+                    'context.objects', 0, 'args', 'clock.interface'
+                )
+                if clock_intf:
+                    self.terminal_output.append(
+                        f"Starte pipewire-aes67 mit Interface-Clock {clock_intf}..."
+                    )
+                else:
+                    self.terminal_output.append(
+                        "Starte pipewire-aes67 (System-Clock)..."
+                    )
+            else:
+                self.terminal_output.append("Starte pipewire-aes67...")
 
             env = QProcessEnvironment.systemEnvironment()
             env.insert("HOME", user_home)
             env.insert("XDG_RUNTIME_DIR", runtime_dir)
             env.insert("DBUS_SESSION_BUS_ADDRESS", bus_address)
 
-            self.terminal_output.append(f"Using XDG_RUNTIME_DIR={runtime_dir}")
+            self.terminal_output.append(f"Config: {use_config}")
+            self.terminal_output.append(f"XDG_RUNTIME_DIR={runtime_dir}")
 
             self.process = QProcess()
             self.process.setProcessEnvironment(env)
@@ -120,7 +160,7 @@ class AES67Tab(QWidget):
             self.process.readyReadStandardError.connect(self.handle_stderr)
             self.process.finished.connect(self.process_finished)
 
-            self.process.start("pipewire-aes67", ["-c", tmp_config, "-v"])
+            self.process.start("pipewire-aes67", ["-c", use_config, "-v"])
             self.is_running = True
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
@@ -144,18 +184,39 @@ class AES67Tab(QWidget):
             self.terminal_output.append("pipewire-aes67 stopped.")
 
     def open_config(self):
-        home = self._get_user_home()
-        config_path = os.path.join(home, ".config/pipewire/pipewire-aes67.conf")
-        if os.path.exists(config_path):
-            self.terminal_output.append(f"Opening config: {config_path}")
-            QProcess.startDetached("xdg-open", [config_path])
+        if os.path.exists(self.config_path):
+            self.terminal_output.append(f"Opening config: {self.config_path}")
+            QProcess.startDetached("xdg-open", [self.config_path])
         else:
             self.terminal_output.append(
-                f"Config nicht gefunden unter: {config_path}"
+                f"Config nicht gefunden unter: {self.config_path}"
             )
             self.terminal_output.append(
-                "Lege eine Config-Datei an oder kopiere sie von /usr/share/pipewire/pipewire-aes67.conf"
+                "Lege eine Config-Datei an oder kopiere sie von\n"
+                f"  {self.default_config_path}"
             )
+
+    def open_config_editor(self):
+        if not os.path.exists(self.config_path):
+            if os.path.exists(self.default_config_path):
+                shutil.copy(self.default_config_path, self.config_path)
+                self.terminal_output.append("Default Config kopiert.")
+            else:
+                self.terminal_output.append("Keine Config gefunden.")
+                return
+            self._init_config()
+
+        if self.config is None:
+            self._init_config()
+        if self.config is None:
+            self.terminal_output.append("Config konnte nicht geladen werden.")
+            return
+
+        from ui.aes67_settings_dialog import AES67SettingsDialog
+        dialog = AES67SettingsDialog(self.config, self)
+        if dialog.exec() == AES67SettingsDialog.DialogCode.Accepted:
+            self.terminal_output.append("Config gespeichert über den Editor.")
+            self._init_config()
 
     def _get_user_home(self):
         sudo_user = os.environ.get('SUDO_USER')
