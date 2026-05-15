@@ -14,6 +14,7 @@ class PTPTab(QWidget):
         self.load_interfaces()
         self.ptp_process = None
         self.is_ptp_running = False
+        self._ptp_offset = None
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -225,6 +226,7 @@ class PTPTab(QWidget):
                 except ValueError:
                     pass
         if value is not None:
+            self._ptp_offset = value
             self.update_status_light(value)
 
     def update_status_light(self, value):

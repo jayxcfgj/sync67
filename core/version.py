@@ -1,0 +1,5 @@
+__version__ = "0.4.0"
+__app_name__ = "sync67"
+__description__ = "Linux Audio-Streaming mit AES67 verwalten, überwachen und konfigurieren."
+__license__ = "MIT"
+__author__ = "jaxcfgj"

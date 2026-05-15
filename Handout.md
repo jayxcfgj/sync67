@@ -185,6 +185,16 @@ Beispiel:
 * Config-Datei öffnen
 * AES67 Config Editor (40 Parameter, 4 Tabs, Stream-Rules-Editor)
 
+## ✅ Session Tab (MVP 0.4 – abgeschlossen)
+
+* Quick-Start: ptp4l + pipewire-aes67 in Reihe starten/stoppen
+* System-Status: PTP (mit Sync-Ampel), AES67, PipeWire auf einen Blick
+* PTP Sync-Ampel: grün ≤200ns, gelb ≤1000ns, rot
+* Xruns-Counter + DSP Load (Übernahme aus PipeWire-Tab)
+* Versionen: PipeWire, LinuxPTP, Python, PyQt6 (installiert/fehlt Markierung)
+* Routing-Tools Buttons: qpwgraph, helvum, coppwr
+* About-Dialog mit Versionsinfo und Lizenz
+
 ## ✅ PipeWire Tab (MVP 0.3 – abgeschlossen)
 
 * Sample Rate steuern (Dropdown: 48000, 96000, 192000 – Apply/Reset/Refresh)

@@ -30,6 +30,7 @@
 - **MVP 0.1** PTP-Tab: ptp4l starten/stoppen, Sync-Status (Ampel), ethtool-Settings
 - **MVP 0.2** AES67-Tab: pipewire-aes67 starten/stoppen, Config-Editor (4 Tabs, ~40 Parameter, RTP-Sink-Multi-Instanz, Dark Theme, stream.rules Raw-Editor)
 - **MVP 0.3** PipeWire-Tab: Rate/Quantum-Steuerung, pw-top Node-Tabelle, DSP/Xruns/Latenz-Status
+- **MVP 0.4** Session-Tab: Quick-Start (ptp4l + aes67), System-Status, Sync-Ampel, Xruns, DSP, Versionen, Routing-Tools
 
 ### Config Editor (`core/aes67_config.py`, `core/aes67_config_meta.py`, `ui/aes67_settings_dialog.py`)
 - Format-erhaltender SPA-Parser (Zeilenbasiert, Kommentare/Formatierung bleiben erhalten)
@@ -53,6 +54,17 @@
 - Node-Tabelle mit Tree-Struktur: pw-top wird via `\s{2,}`-Split geparst, Parent-Child via `+` Prefix, 2. Iteration (effektive Running-States)
 - Tabellen-Spalten: ID, Status (Running/Idle/Closed), Name, Quantum, Format, CH, DSP (Label+Mini-Bar), Waiting, Busy, Xruns, Rate
 - Read-Only (kein Selection), Spaltenbreiten via QSettings gemerkt
+
+### Session Tab (MVP 0.4)
+- `ui/session_tab.py`: Quick-Start (ptp4l + aes67), System-Status, Sync-Ampel, Versionen
+- Start-Reihenfolge: ptp4l → 2s warten → pipewire-aes67; Stop: aes67 → ptp4l
+- Status: PTP (RUNNING/stopped + Offset in ns), AES67, PipeWire (Rate/Quantum)
+- Sync-Ampel (grün ≤200ns, gelb ≤1000ns, rot) + Xruns-Counter + DSP-Bar
+- Versionen-Block: PipeWire, LinuxPTP, Python, PyQt6 (rot/grün je nach installiert)
+- Routing-Tools: qpwgraph, helvum, coppwr als Buttons (`shutil.which`-Prüfung)
+- About-Button (`ℹ`) im Versionen-Block + als CornerWidget in Tab-Leiste
+- `core/version.py`: Version, Name, Beschreibung, Lizenz, Author
+- `ui/about_dialog.py`: About QDialog mit allen Versionen
 
 ### Wichtige Implementation-Details
 - App läuft als root → `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME` via `SUDO_UID` setzen
