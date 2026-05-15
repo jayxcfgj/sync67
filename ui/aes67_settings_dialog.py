@@ -350,7 +350,7 @@ class RtpSinkTabWidget(QWidget):
                        and p.module == 'libpipewire-module-rtp-sink']
 
         for pdef in sink_params:
-            keys = ('context.modules', self.sink_index) + tuple(pdef.path.split('.'))
+            keys = ('context.modules', self.sink_index) + pdef.path
             val = self.config.get(*keys)
             container, pw = create_widget(pdef, val)
             self.widgets[pdef.key] = pw
@@ -531,7 +531,7 @@ class AES67SettingsDialog(QDialog):
         for pdef in params:
             if pdef.key == 'system.clock.enabled':
                 continue
-            keys = ('context.objects', 0) + tuple(pdef.path.split('.'))
+            keys = ('context.objects', 0) + pdef.path
             val = self.config.get(*keys)
             container, pw = create_widget(pdef, val)
             form.addRow(container)
@@ -562,7 +562,7 @@ class AES67SettingsDialog(QDialog):
 
         params = get_params_for_section('RTP SAP Input')
         for pdef in params:
-            keys = ('context.modules', pdef.module) + tuple(pdef.path.split('.'))
+            keys = ('context.modules', pdef.module) + pdef.path
             val = self.config.get(*keys)
             container, pw = create_widget(pdef, val)
             form.addRow(container)
@@ -615,9 +615,9 @@ class AES67SettingsDialog(QDialog):
             if not pdef.advanced:
                 continue
             if pdef.module == 'context.objects':
-                keys = ('context.objects', 0) + tuple(pdef.path.split('.'))
+                keys = ('context.objects', 0) + pdef.path
             else:
-                keys = ('context.modules', pdef.module) + tuple(pdef.path.split('.'))
+                keys = ('context.modules', pdef.module) + pdef.path
             val = self.config.get(*keys)
             container, pw = create_widget(pdef, val)
             form.addRow(container)
@@ -659,15 +659,10 @@ class AES67SettingsDialog(QDialog):
                     value = pw.get_value()
                 except Exception:
                     continue
-                # Build keys for set()
                 if pdef.module == 'context.objects':
-                    keys = ('context.objects', 0) + tuple(pdef.path.split('.'))
+                    keys = ('context.objects', 0) + pdef.path
                 else:
-                    # For rtp-sink, need to find the right module index
-                    keys = (pdef.module,) + tuple(pdef.path.split('.'))
-                    # Prepend 'context.modules'
-                    if pdef.module != 'context.objects':
-                        keys = ('context.modules', pdef.module) + keys[1:]
+                    keys = ('context.modules', pdef.module) + pdef.path
                 
                 self.config.set(value, *keys)
 
@@ -697,7 +692,7 @@ class AES67SettingsDialog(QDialog):
                 for key, val in vals.items():
                     pdef = PARAM_MAP.get(key)
                     if pdef and pdef.module == 'libpipewire-module-rtp-sink':
-                        keys = ('context.modules', tab.sink_index) + tuple(pdef.path.split('.'))
+                        keys = ('context.modules', tab.sink_index) + pdef.path
                         self.config.set(val, *keys)
 
             self.config.save()
@@ -744,9 +739,9 @@ class AES67SettingsDialog(QDialog):
         for key, pw in self.widgets.items():
             pdef = pw.defn
             if pdef.module == 'context.objects':
-                keys = ('context.objects', 0) + tuple(pdef.path.split('.'))
+                keys = ('context.objects', 0) + pdef.path
             elif pdef.module:
-                keys = ('context.modules', pdef.module) + tuple(pdef.path.split('.'))
+                keys = ('context.modules', pdef.module) + pdef.path
             else:
                 continue
             val = self.config.get(*keys)
