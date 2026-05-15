@@ -9,11 +9,10 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
     QCheckBox, QComboBox, QTextEdit, QPushButton,
     QGroupBox, QFormLayout, QWidget, QScrollArea,
-    QMessageBox, QGridLayout
+    QMessageBox, QGridLayout, QApplication
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QRegularExpressionValidator
-from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtCore import Qt, QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator, QPalette, QColor
 
 from core.aes67_config import AES67Config
 from core.aes67_config_meta import (
@@ -74,10 +73,12 @@ class ParamWidget:
         raise NotImplementedError
 
     def mark_deviation(self, is_deviation):
-        bg = '#E3F2FD' if is_deviation else ''
-        self.widget.setStyleSheet(
-            f'background-color: {bg};' if bg else ''
-        )
+        if is_deviation:
+            self.widget.setStyleSheet(
+                'background-color: #3a3a3a; border-left: 3px solid #f0c040;'
+            )
+        else:
+            self.widget.setStyleSheet('')
 
 
 class StringWidget(ParamWidget):
@@ -258,7 +259,6 @@ def create_widget(param_def, current_value):
         w.setToolTip(tooltip)
         w.setMinimumWidth(200)
         w.addItems(_load_interfaces())
-        w.setEditable(True)
         pw = ChoiceWidget(param_def, w, default_label)
 
     elif ptype == 'ip':
@@ -387,6 +387,103 @@ class AES67SettingsDialog(QDialog):
         self.resize(700, 600)
         self._init_ui()
 
+    def _apply_dark_theme(self):
+        app = QApplication.instance()
+        if app:
+            pal = QPalette()
+            pal.setColor(QPalette.ColorRole.Window, QColor('#2b2b2b'))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor('#e0e0e0'))
+            pal.setColor(QPalette.ColorRole.Base, QColor('#1e1e1e'))
+            pal.setColor(QPalette.ColorRole.AlternateBase, QColor('#353535'))
+            pal.setColor(QPalette.ColorRole.ToolTipBase, QColor('#1e1e1e'))
+            pal.setColor(QPalette.ColorRole.ToolTipText, QColor('#e0e0e0'))
+            pal.setColor(QPalette.ColorRole.Text, QColor('#e0e0e0'))
+            pal.setColor(QPalette.ColorRole.Button, QColor('#3c3c3c'))
+            pal.setColor(QPalette.ColorRole.ButtonText, QColor('#e0e0e0'))
+            pal.setColor(QPalette.ColorRole.BrightText, QColor('#ff6b6b'))
+            pal.setColor(QPalette.ColorRole.Link, QColor('#4a9eff'))
+            pal.setColor(QPalette.ColorRole.Highlight, QColor('#4a9eff'))
+            pal.setColor(QPalette.ColorRole.HighlightedText, QColor('#ffffff'))
+            app.setPalette(pal)
+
+        tab_style = """
+            QTabWidget::pane {
+                background-color: #2b2b2b;
+                border: 1px solid #555;
+            }
+            QTabBar::tab {
+                background-color: #3c3c3c;
+                color: #e0e0e0;
+                padding: 6px 14px;
+                border: 1px solid #555;
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background-color: #2b2b2b;
+                border-bottom: 1px solid #2b2b2b;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #4a4a4a;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                selection-background-color: #4a9eff;
+            }
+            QToolTip {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                border: 1px solid #666;
+                padding: 4px 6px;
+                font-size: 12px;
+                border-radius: 3px;
+            }
+        """
+        self.tabs.setStyleSheet(tab_style)
+
+        btn_style = """
+            QPushButton {
+                background-color: #3c3c3c;
+                color: #e0e0e0;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 5px 14px;
+            }
+            QPushButton:hover {
+                background-color: #4a4a4a;
+                border-color: #777;
+            }
+            QPushButton:pressed {
+                background-color: #555;
+            }
+        """
+        self.apply_btn.setStyleSheet(btn_style)
+        self.cancel_btn.setStyleSheet(btn_style)
+        self.reset_btn.setStyleSheet(btn_style)
+
+        scroll_style = """
+            QScrollBar:vertical {
+                background-color: #2b2b2b;
+                width: 10px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #555;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #777;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """
+        for scroll in self.findChildren(QScrollArea):
+            scroll.setStyleSheet(scroll_style)
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
@@ -418,6 +515,8 @@ class AES67SettingsDialog(QDialog):
         btn_layout.addWidget(self.cancel_btn)
         btn_layout.addWidget(self.reset_btn)
         layout.addLayout(btn_layout)
+
+        self._apply_dark_theme()
 
     # ── Tab-Erstellung ──────────────────────────────────────────
 
