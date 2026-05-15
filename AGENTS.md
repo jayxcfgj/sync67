@@ -45,6 +45,10 @@
     `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` und `HOME` explizit auf
     den User-Wert gesetzt werden (via `SUDO_UID` aus der Umgebung).
     Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
+  * Da die App als root läuft, wird die PTP-Hardware-Clock (PHC) nicht
+    korrekt erkannt. Daher wird in einer temporären Config-Datei
+    (`/dev/shm/pipewire-aes67-override.conf`) `clock.interface` auskommentiert,
+    sodass die System-Clock statt des PHC verwendet wird.
 - Keine Build/Test/Lint-Konfiguration vorhanden
 
 ## Beim Hinzufügen von Features
