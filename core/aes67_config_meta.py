@@ -88,16 +88,6 @@ CONFIG_PARAMS: list[ParamDef] = [
                      'Muss aktiviert sein damit andere Module sie nutzen können.',
              section='PTP Clock'),
 
-    # ── System-Clock Fallback (PTP Clock) ──────────────────────
-    ParamDef('system.clock.enabled', 'context.objects',
-             'args.clock.interface', 'bool',
-             False,
-             label='System-Clock verwenden (PHC deaktivieren)',
-             tooltip='Wenn aktiviert: clock.interface wird auskommentiert.\n'
-                     'Die System-Clock wird statt der PHC verwendet.\n'
-                     'Nötig wenn die App als root läuft und PHC Timestamp 0 liefert.',
-             section='PTP Clock'),
-
     # ── RT-Modul (Expert) ──────────────────────────────────────
     ParamDef('nice.level', 'libpipewire-module-rt',
              'args.nice.level', 'int',
@@ -174,7 +164,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              tooltip='UNIX-Socket für PTP-Management-Nachrichten.\n'
                      'Nur nötig bei ptp4l Version 4.',
              section='RTP SAP Input'),
-    ParamDef('sess.latency.msec.sap', 'libpipewire-module-rtp-sap',
+    ParamDef('sap.sess.latency.msec', 'libpipewire-module-rtp-sap',
              'args.sess.latency.msec', 'int',
              3,
              label='SAP Latenz (ms)',
@@ -278,7 +268,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              tooltip='RTP-Timestamps direkt gegen PTP-synchronisierten Driver.\n'
                      'Kann Latenz reduzieren wenn Referenz-Clocks identisch sind.',
              section='RTP Sink Output'),
-    ParamDef('sink.latency', 'libpipewire-module-rtp-sink',
+    ParamDef('sink.sess.latency.msec', 'libpipewire-module-rtp-sink',
              'args.sess.latency.msec', 'int',
              3,
              label='Sink Latenz (ms)',

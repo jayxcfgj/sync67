@@ -25,13 +25,13 @@ class ConfigWriteError(IOError):
 
 
 _SECTION_RE = re.compile(
-    r'^(?P<indent>\s*)(?P<key>context\.\w+)\s*=\s*(?P<brace>[\[\{])\s*$'
+    r'^(?P<indent>\s*)(?P<key>context\.[\w\-]+)\s*=\s*(?P<brace>[\[\{])\s*$'
 )
 _KV_RE = re.compile(
-    r'^(?P<indent>\s*)(?P<key>[\w.\-]+)\s*=\s*(?P<value>.+?)\s*,?\s*$'
+    r'^(?P<indent>\s*)(?P<key>[\w.\-*]+)\s*=\s*(?P<value>(?!\s*[\{\[]).+?)\s*,?\s*$'
 )
 _BLOCK_START_RE = re.compile(
-    r'^(?P<indent>\s*)(?P<key>[\w.\-]+)\s*=\s*(?P<brace>[\[\{])\s*$'
+    r'^(?P<indent>\s*)(?P<key>[\w.\-*]+)\s*=\s*(?P<brace>[\[\{])\s*$'
 )
 
 
@@ -69,7 +69,12 @@ def format_value(value):
         return '{ }'
     if value is None:
         return 'null'
-    return str(value)
+    # Quote strings that contain spaces or special characters
+    val = str(value)
+    if ' ' in val or '"' in val or val.startswith('#'):
+        if not val.startswith('"'):
+            val = '"' + val.replace('"', '\\"') + '"'
+    return val
 
 
 class AES67Config:
@@ -97,6 +102,10 @@ class AES67Config:
         self._data = {}
         self._modified = False
         self._parse()
+        if not self._data:
+            raise ConfigParseError(
+                f"Konnte keine Sektionen in {self._loaded_path} parsen"
+            )
 
     def save(self, path=None):
         path = str(path or self._loaded_path)
@@ -106,8 +115,11 @@ class AES67Config:
             shutil.copy(path, path + '.bak')
         try:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+            text = '\n'.join(self._raw_lines)
+            if not text.endswith('\n'):
+                text += '\n'
             with open(path, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(self._raw_lines))
+                f.write(text)
         except OSError as e:
             raise ConfigWriteError(f"Could not write {path}: {e}") from e
         self._modified = False
@@ -196,7 +208,12 @@ class AES67Config:
     def reset_to_default(self):
         if not os.path.exists(self.default_path):
             return False
-        shutil.copy(self.default_path, self._loaded_path)
+        if not self._loaded_path or self._loaded_path == self.default_path:
+            return False
+        try:
+            shutil.copy(self.default_path, self._loaded_path)
+        except (OSError, PermissionError) as e:
+            raise ConfigWriteError(f"Konnte Default nicht kopieren: {e}") from e
         self._modified = True
         self.load(self._loaded_path)
         return True
@@ -296,7 +313,8 @@ class AES67Config:
 
     def _parse_braced_block(self, lines, start_idx, parent_path):
         """Parse { } block. Returns (data, end_idx).
-        Records entries in _line_map as 'parent_path.key' for each kv_pair.
+        Depth is tracked via ALL { } chars; sub-blocks (key = {...}) are
+        handled recursively so their braces don't affect depth here.
         """
         result = {}
         i = start_idx
@@ -319,32 +337,22 @@ class AES67Config:
                 i += 1
                 continue
 
-            # Opening brace nested
-            if '{' in stripped and not stripped.startswith('#'):
-                # But might be key = { block or just { ... }
-                # Only count if not already handled as block_start
-                pass
+            # Count ALL braces on this line (used only for unclassified lines)
+            opens = stripped.count('{')
+            closes = stripped.count('}')
 
-            # Closing brace
-            close_test = stripped.rstrip(',').strip()
-            if close_test == '}':
-                depth -= 1
-                if depth == 0:
-                    return result, i
-                i += 1
-                continue
-
-            # key = { ... } sub-block
+            # Try block-start first (key = { … } sub-block)
             m = _BLOCK_START_RE.match(line)
             if m and m.group('brace') == '{':
                 k = m.group('key')
                 sub_path = parent_path + '.' + k if parent_path else k
                 sub, end_idx = self._parse_braced_block(lines, i + 1, sub_path)
                 result[k] = sub
+                # sub-block consumed its own braces; do NOT count them here
                 i = end_idx + 1
                 continue
 
-            # key = [ ... ] sub-array
+            # Try array-start (key = [ … ] sub-array)
             m = _BLOCK_START_RE.match(line)
             if m and m.group('brace') == '[':
                 k = m.group('key')
@@ -354,7 +362,7 @@ class AES67Config:
                 i = end_idx + 1
                 continue
 
-            # key = value
+            # Try key = value
             m = _KV_RE.match(line)
             if m:
                 k = m.group('key')
@@ -365,6 +373,10 @@ class AES67Config:
                 i += 1
                 continue
 
+            # Unclassified line: adjust depth by all braces present
+            depth += opens - closes
+            if depth <= 0:
+                return result, i
             i += 1
 
         return result, i
@@ -428,7 +440,7 @@ class AES67Config:
         return result
 
     def _parse_inline_kv(self, text, target):
-        pat = re.compile(r'([\w.\-]+)\s*=\s*("[^"]*"|\[[^\]]*\]|\S+)')
+        pat = re.compile(r'([\w.\-*]+)\s*=\s*("[^"]*"|\[[^\]]*\]|\S+)')
         pos = 0
         while pos < len(text):
             m = pat.search(text, pos)
@@ -442,11 +454,112 @@ class AES67Config:
     # ─── Line lookup ─────────────────────────────────────────────
 
     def _find_line_idx(self, keys):
-        """Find raw line index by building a path from keys and
-        looking it up in _line_map.
+        """Find raw line index for key path.
+        First tries _line_map lookup. If that fails
+        (e.g. after add/remove rtp_sink), falls back to a line scan.
         """
         if len(keys) < 2:
             return None
+        section = keys[0]
+
+        # ── _line_map lookup ─────────────────────────────────
+        if section in ('context.properties', 'context.spa-libs'):
+            target_path = '.'.join(keys)
+            for path, idx in self._line_map:
+                if path == target_path:
+                    return idx
+            return self._scan_line_idx(keys)
+
+        if section == 'context.objects':
+            obj_id = keys[1]
+            obj_idx = obj_id if isinstance(obj_id, int) else None
+            if obj_idx is None:
+                objs = self._data.get('context.objects', [])
+                for i, o in enumerate(objs):
+                    if isinstance(o, dict) and o.get('factory') == obj_id:
+                        obj_idx = i
+                        break
+            if obj_idx is None:
+                return None
+            target_path = f'context.objects[{obj_idx}].' + '.'.join(
+                str(k) for k in keys[2:])
+            for path, idx in self._line_map:
+                if path == target_path:
+                    return idx
+            return self._scan_line_idx(keys)
+
+        if section == 'context.modules':
+            module_id = keys[1]
+            mod_idx = module_id if isinstance(module_id, int) else None
+            if mod_idx is None:
+                mod_idx = self.get_module_index(module_id)
+            if mod_idx < 0:
+                return None
+            target_path = f'context.modules[{mod_idx}].' + '.'.join(
+                str(k) for k in keys[2:])
+            for path, idx in self._line_map:
+                if path == target_path:
+                    return idx
+            return self._scan_line_idx(keys)
+
+        return None
+
+    # ─── Fallback line scan (used when _line_map is stale) ────
+
+    def _scan_line_idx(self, keys):
+        """Scan _raw_lines for a key path, accounting for brace depth.
+        This is a fallback when _line_map doesn't have the entry
+        (e.g. after add/remove rtp_sink).
+        """
+        if len(keys) < 3:
+            return None
+        section = keys[0]
+        obj_id = keys[1]
+        target = keys[-1]
+
+        if section not in ('context.modules', 'context.objects'):
+            return None
+
+        id_field = 'name' if section == 'context.modules' else 'factory'
+        in_target = False
+        in_args = False
+        depth = 0
+
+        for idx, line in enumerate(self._raw_lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+
+            opens = stripped.count('{')
+            closes = stripped.count('}')
+            depth += opens - closes
+
+            if opens > 0 and depth > 0 and depth <= opens:
+                in_target = False
+                in_args = False
+                # Check if this line opens a new module/object
+                if isinstance(obj_id, int):
+                    pass  # would need obj counting – skip for simplicity
+                else:
+                    pat = f'{id_field} = {obj_id}'
+                    if pat in stripped:
+                        in_target = True
+
+            if in_target and _BLOCK_START_RE.match(line):
+                bm = _BLOCK_START_RE.match(line)
+                if bm and bm.group('key') == 'args':
+                    in_args = True
+
+            if in_target and in_args and _KV_RE.match(line):
+                km = _KV_RE.match(line)
+                if km and km.group('key') == target:
+                    return idx
+
+            if depth == 0 and in_target:
+                in_target = False
+                in_args = False
+
+        return None
         section = keys[0]
 
         if section in ('context.properties', 'context.spa-libs'):

@@ -24,17 +24,24 @@ from core.aes67_config_meta import (
 
 # ── Hilfsfunktionen ────────────────────────────────────────────
 
+_IFACE_CACHE = None
+
 def _load_interfaces():
-    """Liste der Netzwerk-Interfaces (ohne lo)."""
+    """Liste der Netzwerk-Interfaces (ohne lo) – gecached."""
+    global _IFACE_CACHE
+    if _IFACE_CACHE is not None:
+        return _IFACE_CACHE
     try:
         result = subprocess.run(['ip', 'link', 'show'],
                                 capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             ifaces = re.findall(r'^\d+: (\w+):', result.stdout, re.MULTILINE)
-            return [i for i in ifaces if i != 'lo']
+            _IFACE_CACHE = [i for i in ifaces if i != 'lo']
+            return _IFACE_CACHE
     except Exception:
         pass
-    return []
+    _IFACE_CACHE = []
+    return _IFACE_CACHE
 
 
 def _strip_quotes(s):
@@ -154,14 +161,22 @@ class PortWidget(ParamWidget):
 
 class MultilineWidget(ParamWidget):
     def get_value(self):
-        return self.widget.toPlainText()
+        text = self.widget.toPlainText().strip()
+        if text.startswith('[') and text.endswith(']'):
+            inner = text[1:-1]
+            items = [item.strip().strip('"') for item in inner.split(',') if item.strip()]
+            return '[' + ', '.join(f'"{item}"' if ' ' in item else item for item in items) + ']'
+        return text
 
     def set_value(self, value):
         if isinstance(value, list):
-            value = '[' + ', '.join(str(v) for v in value) + ']'
-        elif isinstance(value, str) and value.startswith('"'):
-            value = value[1:-1]
-        self.widget.setPlainText(str(value))
+            display = ', '.join(str(v).strip('"') for v in value)
+            self.widget.setPlainText(display)
+        elif isinstance(value, str):
+            display = value.strip('"').strip('[').strip(']')
+            self.widget.setPlainText(display)
+        else:
+            self.widget.setPlainText(str(value))
 
 
 def create_widget(param_def, current_value):
@@ -371,7 +386,6 @@ class AES67SettingsDialog(QDialog):
         self.setMinimumSize(650, 550)
         self.resize(700, 600)
         self._init_ui()
-        self._mark_changes()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -425,14 +439,15 @@ class AES67SettingsDialog(QDialog):
             self.widgets[pdef.key] = pw
 
         # System-Clock Checkbox (special handling)
-        sys_def = PARAM_MAP['system.clock.enabled']
-        self.system_clock_cb = QCheckBox(sys_def.label)
-        self.system_clock_cb.setToolTip(sys_def.tooltip)
-        # Check if clock.interface is commented out
-        if self.config._loaded_path:
-            with open(self.config._loaded_path) as f:
-                raw = f.read()
-            is_commented = '#clock.interface' in raw or 'clock.interface =' not in raw.split('context.objects')[1].split('args')[1].split('\n')[0] if 'context.objects' in raw else False
+        self.system_clock_cb = QCheckBox('System-Clock verwenden (PHC deaktivieren)')
+        self.system_clock_cb.setToolTip(
+            'Wenn aktiviert: clock.interface wird auskommentiert.\n'
+            'Die System-Clock wird statt der PHC verwendet.\n'
+            'Nötig wenn die App als root läuft und PHC Timestamp 0 liefert.'
+        )
+        # Check if clock.interface is currently commented out
+        is_commented = self._is_clock_interface_commented()
+        self.system_clock_cb.setChecked(is_commented)
         self.system_clock_cb.stateChanged.connect(self._mark_changes)
         form.addRow(self.system_clock_cb)
 
@@ -511,6 +526,28 @@ class AES67SettingsDialog(QDialog):
 
         scroll.setWidget(content)
         self.tabs.addTab(scroll, 'Expert')
+
+    def _is_clock_interface_commented(self):
+        """Check if clock.interface is commented out in the PTP0-Driver block."""
+        if not self.config._loaded_path:
+            return False
+        try:
+            with open(self.config._loaded_path) as f:
+                lines = f.readlines()
+        except Exception:
+            return False
+        in_ptp_block = False
+        for line in lines:
+            stripped = line.strip()
+            if '{ factory = spa-node-factory' in stripped or ' factory = ' in stripped:
+                in_ptp_block = True
+                continue
+            if in_ptp_block:
+                if stripped.startswith('}'):
+                    break
+                if 'clock.interface' in stripped:
+                    return stripped.startswith('#')
+        return False
 
     # ── Actions ─────────────────────────────────────────────────
 
@@ -631,7 +668,14 @@ class AES67SettingsDialog(QDialog):
         current = self.sink_tab_widget.currentIndex()
         if current < 0 or current >= len(self.rtp_sink_tabs):
             return
-        # Find the actual module index
+        reply = QMessageBox.question(
+            self, 'Sink entfernen',
+            'Diesen Sink wirklich entfernen?\n'
+            'Die Konfiguration wird gelöscht.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
         modules = self.config._data.get('context.modules', [])
         sink_indices = [i for i, m in enumerate(modules)
                         if isinstance(m, dict) and m.get('name') == 'libpipewire-module-rtp-sink']

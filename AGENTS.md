@@ -40,15 +40,17 @@
   * Start/Stop Buttons für `pipewire-aes67`
   * Terminal-Ausgabebereich für Logs und Fehlermeldungen
   * Config-Button zum Öffnen von `~/.config/pipewire/pipewire-aes67.conf`
+  * AES67 Config Editor Button → öffnet GUI-Editor mit 4 Tabs, ~40 Parametern
   * Kein sudo erforderlich
   * Wichtig: App läuft scheinbar als root (os.getuid() == 0). Daher müssen
     `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` und `HOME` explizit auf
     den User-Wert gesetzt werden (via `SUDO_UID` aus der Umgebung).
     Sonst findet pipewire-aes67 weder Config noch PipeWire-Socket.
-  * Da die App als root läuft, wird die PTP-Hardware-Clock (PHC) nicht
-    korrekt erkannt. Daher wird in einer temporären Config-Datei
-    (`/dev/shm/pipewire-aes67-override.conf`) `clock.interface` auskommentiert,
-    sodass die System-Clock statt des PHC verwendet wird.
+  * PHC-Problem (Timestamp 0 als root): gelöst via "System-Clock verwenden"
+    Checkbox im Config-Editor (PTP Clock Tab). Kein `/dev/shm`-Override mehr nötig.
+- Config-Editor (`core/aes67_config.py`, `core/aes67_config_meta.py`,
+  `ui/aes67_settings_dialog.py`): format-erhaltender SPA-Parser, 41 Parameter,
+  4 Tabs, RTP-Sink-Multi-Instanz, System-Clock-Checkbox, Deviation-Highlighting.
 - Keine Build/Test/Lint-Konfiguration vorhanden
 
 ## Beim Hinzufügen von Features
