@@ -282,6 +282,61 @@ class AES67Config:
     def is_modified(self):
         return self._modified
 
+    def _find_block_range(self, target_key):
+        """Findet Start/End-Zeilen eines Blocks anhand eines Key-Worts
+        (z.B. 'stream.rules'). Scannt _raw_lines nach key = [  oder key = {.
+        Gibt (start, end) oder (None, None) zurück.
+        """
+        for start, line in enumerate(self._raw_lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            # Match: key = [  or key = {
+            pat = re.compile(r'^\s*' + re.escape(target_key) + r'\s*=\s*[\[\{]')
+            if pat.match(line):
+                brace_char = stripped.rstrip()[-1]
+                close_char = '}' if brace_char == '{' else ']'
+                depth = 1
+                for end in range(start + 1, len(self._raw_lines)):
+                    s = self._raw_lines[end].strip()
+                    opens = s.count(brace_char)
+                    closes = s.count(close_char)
+                    depth += opens - closes
+                    if depth <= 0:
+                        return start, end
+        return None, None
+
+    def get_raw_block(self, *keys):
+        """Extrahiert Rohtext für einen verschachtelten Block
+        (z.B. stream.rules) aus _raw_lines.
+        Gibt (start_idx, end_idx, text) oder (None, None, None) zurück.
+        """
+        if len(keys) < 2:
+            return None, None, None
+        target_key = keys[-1]
+        start, end = self._find_block_range(target_key)
+        if start is None:
+            return None, None, None
+        lines = self._raw_lines[start:end + 1]
+        return start, end, '\n'.join(lines)
+
+    def set_raw_block(self, text, *keys):
+        """Ersetzt Rohtext für einen Block (z.B. stream.rules).
+        text muss den kompletten Block inkl. Header-Zeile enthalten.
+        """
+        if len(keys) < 2:
+            return False
+        target_key = keys[-1]
+        start, end = self._find_block_range(target_key)
+        if start is None:
+            return False
+        new_lines = text.split('\n')
+        del self._raw_lines[start:end + 1]
+        for i, line in enumerate(new_lines):
+            self._raw_lines.insert(start + i, line)
+        self._modified = True
+        return True
+
     # ─── Parsing ─────────────────────────────────────────────────
 
     def _parse(self):

@@ -608,9 +608,11 @@ class AES67SettingsDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
-        form = QFormLayout(content)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        layout = QVBoxLayout(content)
 
+        # Advanced parameter widgets
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         for pdef in CONFIG_PARAMS:
             if not pdef.advanced:
                 continue
@@ -622,7 +624,38 @@ class AES67SettingsDialog(QDialog):
             container, pw = create_widget(pdef, val)
             form.addRow(container)
             self.widgets[pdef.key] = pw
+        layout.addLayout(form)
 
+        # ── stream.rules Raw Editor ────────────────────────────
+        rules_group = QGroupBox('stream.rules (Raw)')
+        rules_layout = QVBoxLayout(rules_group)
+
+        rules_label = QLabel(
+            'Bearbeite die SAP-Stream-Regeln direkt im SPA-Format.\n'
+            'Änderungen werden beim Apply übernommen.'
+        )
+        rules_label.setWordWrap(True)
+        rules_layout.addWidget(rules_label)
+
+        self.rules_editor = QTextEdit()
+        self.rules_editor.setMinimumHeight(200)
+        self.rules_editor.setStyleSheet(
+            'font-family: "Courier New", monospace; font-size: 11px;'
+        )
+        rules_layout.addWidget(self.rules_editor)
+
+        # Load current stream.rules raw text
+        _, _, rules_text = self.config.get_raw_block(
+            'context.modules', 'libpipewire-module-rtp-sap', 'args', 'stream.rules'
+        )
+        if rules_text:
+            self.rules_editor.setPlainText(rules_text)
+        else:
+            self.rules_editor.setPlainText('# Keine stream.rules gefunden')
+        self.rules_editor.textChanged.connect(self._mark_changes)
+
+        layout.addWidget(rules_group)
+        layout.addStretch()
         scroll.setWidget(content)
         self.tabs.addTab(scroll, 'Expert')
 
@@ -694,6 +727,16 @@ class AES67SettingsDialog(QDialog):
                     if pdef and pdef.module == 'libpipewire-module-rtp-sink':
                         keys = ('context.modules', tab.sink_index) + pdef.path
                         self.config.set(val, *keys)
+
+            # Save stream.rules raw editor
+            if hasattr(self, 'rules_editor'):
+                rules_text = self.rules_editor.toPlainText().strip()
+                if rules_text and not rules_text.startswith('#'):
+                    self.config.set_raw_block(
+                        rules_text,
+                        'context.modules', 'libpipewire-module-rtp-sap',
+                        'args', 'stream.rules'
+                    )
 
             self.config.save()
             QMessageBox.information(self, 'Erfolg', 'Config gespeichert.')
