@@ -4,3 +4,6 @@ __pycache__/
 *.swp
 *~
 .DS_Store
+AGENTS.md
+Handout.md
+Readme.md

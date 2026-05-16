@@ -2,7 +2,7 @@
 
 # sync67
 
-A Linux desktop tool for managing, monitoring and configuring **AES67 audio streaming** with **PipeWire**.
+A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio streaming** with **PipeWire**.
 
 > **sync67 does NOT replace patchbay tools** like qpwgraph, helvum or coppwr.
 > Those are used alongside sync67 for audio routing and patching.
@@ -12,6 +12,8 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
 ## Features
 
 ### PTP Tab
+![PTP Tab + PTP4L Config Editor](assets/ptp_tab+config_editor.png)
+
 - Network interface selection (via `ip link show`)
 - ptp4l start/stop with live terminal output
 - Sync status indicator (traffic light: green ≤200ns, yellow ≤1000ns, red)
@@ -23,6 +25,8 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
   - Deviation highlighting, tooltips, dark theme
 
 ### AES67 Tab
+![AES67 Tab + Config Editor](assets/aes67-tab+config-editor.png)
+
 - pipewire-aes67 start/stop with live terminal output
 - Open config file in external editor
 - **AES67 Config Editor**: full GUI editor for `pipewire-aes67.conf`
@@ -35,6 +39,8 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
   - Dark theme
 
 ### PipeWire Tab
+![PipeWire Tab](assets/pipewire-tab.png)
+
 - Sample Rate control (48000, 96000, 192000) with Apply/Reset/Refresh
 - Quantum control (16-8192, editable) with Apply/Reset/Refresh
   - Uses `clock.force-rate` / `clock.force-quantum` for immediate node effect
@@ -48,6 +54,8 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
   - Updates every 2s via `pw-top` (second iteration for effective Running states)
 
 ### Session Tab
+![Session Tab](assets/session-tab.png)
+
 - **Quick-Start**: Start ptp4l + pipewire-aes67 in the correct order with one button
   - Start sequence: ptp4l → 2s delay → pipewire-aes67
   - Stop sequence: aes67 → ptp4l
@@ -74,59 +82,37 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
 
 ## Installation
 
-*(Instructions to be added – currently in early development / Proof-of-Concept phase)*
+**1. Clone the repository**
+```bash
+git clone https://github.com/jaxcfgj/sync67.git
+```
 
-**Quick start:**
+**2. Enter the directory**
+```bash
+cd sync67
+```
+
+**3. Install dependencies**
+
+*Debian / Ubuntu / Linux Mint:*
+```bash
+sudo apt install python3-pyqt6 pipewire linuxptp
+```
+
+*Arch Linux:*
+```bash
+sudo pacman -S python-pyqt6 pipewire linuxptp
+```
+
+*Fedora:*
+```bash
+sudo dnf install python3-qt6 pipewire linuxptp
+```
+
+**4. Run (requires root)**
 ```bash
 sudo python3 main.py
 ```
-
-The app runs as root (`os.getuid() == 0`). Environment variables `XDG_RUNTIME_DIR`,
-`DBUS_SESSION_BUS_ADDRESS`, and `HOME` are automatically set to the original user's
-values via `SUDO_UID` to ensure PipeWire and D-Bus connectivity.
-
----
-
-## Project Structure
-
-```
-sync67/
-├── main.py                  # Application entry point
-├── core/
-│   ├── aes67_config.py      # SPA config parser/serializer
-│   ├── aes67_config_meta.py # Parameter definitions (~40 params)
-│   ├── ptp4l_config.py      # PTP4L config parser/serializer
-│   ├── ptp4l_config_meta.py # Parameter definitions (~119 params)
-│   ├── ptp4l_default.cfg    # Default PTP4L config for reset
-│   └── version.py           # Version, app info, license
-├── ui/
-│   ├── main_window.py       # Main window with tab widget
-│   ├── ptp_tab.py           # PTP clock tab
-│   ├── aes67_tab.py         # AES67 control tab
-│   ├── aes67_settings_dialog.py  # Config editor dialog
-│   ├── pipewire_tab.py      # PipeWire monitoring tab
-│   ├── session_tab.py       # Session management tab
-│   ├── about_dialog.py      # About dialog
-│   ├── ptp4l_config_dialog.py # PTP4L config editor dialog
-│   └── settings_dialog.py   # PTP ethtool settings
-├── docs/
-│   ├── mvp.md               # MVP roadmap
-│   └── impl-aes67-config-editor.md  # Implementation plan
-├── AGENTS.md                # Agent guidance (internal)
-├── Handout.md               # Project overview (German)
-└── README.md                # This file
-```
-
----
-
-## Architecture Principles
-
-- **Small steps**: No huge monolithic solutions. Small, testable features.
-- **No over-engineering**: Understandable, maintainable, pragmatic.
-- **Modularity**: UI, services, core logic, widgets are separated.
-- **UI ↔ Logic separation**: UI → Service Layer → System process.
-- **GUI grows organically** with features, not designed upfront.
-- **Existing Linux audio tools are respected**: sync67 complements qpwgraph, helvum, coppwr.
 
 ---
 
@@ -164,3 +150,7 @@ SOFTWARE.
 - **Sync**hronization
 - PTP Clocking
 - Realtime Audio Networking
+
+## Nodes
+
+The app was made with heavy usage of various LLMs.
