@@ -36,16 +36,16 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'clock.interface'), 'interface',
              '"eth0"',
              label='Netzwerk-Interface (PHC)',
-             tooltip='Netzwerkschnittstelle für die PTP Hardware Clock (PHC).\n'
-                     'Wird genutzt um automatisch das passende /dev/ptpX zu finden.\n'
-                     'Bei Problemen: "System-Clock verwenden" aktivieren.',
+             tooltip='Network interface for the PTP Hardware Clock (PHC).\n'
+                     'Used to automatically find the matching /dev/ptpX.\n'
+                     'If issues: enable "Use System Clock".',
              section='PTP Clock'),
     ParamDef('clock.device', 'context.objects',
              ('args', 'clock.device'), 'string',
              '"/dev/ptp0"',
-             label='PHC Gerät',
-             tooltip='PTP Hardware Clock-Gerät.\n'
-                     'Wird nur verwendet wenn kein Interface angegeben ist.',
+             label='PHC Device',
+             tooltip='PTP Hardware Clock device.\n'
+                     'Only used when no interface is specified.',
              section='PTP Clock'),
     ParamDef('clock.id', 'context.objects',
              ('args', 'clock.id'), 'choice',
@@ -53,7 +53,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              label='Clock-ID',
              tooltip='Alternative Clock-Quelle.\n'
                      '"tai" = CLOCK_TAI (auch von NTP syncbar).\n'
-                     'Leer lassen = automatisch via Interface/Device.',
+                     'Leer lassen = automatic via Interface/Device.',
              section='PTP Clock',
              choices=['', 'tai']),
     ParamDef('clock.name', 'context.objects',
@@ -66,9 +66,9 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('priority.driver', 'context.objects',
              ('args', 'priority.driver'), 'int',
              100000,
-             label='Driver-Priorität',
-             tooltip='Priorität des PTP-Treibers.\n'
-                     'Niedrigerer Wert = höhere Priorität.',
+             label='Driver Priority',
+             tooltip='Priority of the PTP driver.\n'
+                     'Lower value = higher priority.',
              section='PTP Clock',
              min_val=0, max_val=1000000, step=1000),
     ParamDef('resync.ms', 'context.objects',
@@ -77,7 +77,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              label='Resync-Intervall (ms)',
              tooltip='Zeitraum in ms nach dem eine Neu-Synchronisation\n'
                      'der Clock erzwungen wird.\n'
-                     'Niedriger = häufigere Resyncs.',
+                     'Lower = more frequent resyncs.',
              section='PTP Clock',
              min_val=0.1, max_val=60.0, step=0.1),
     ParamDef('object.export', 'context.objects',
@@ -85,7 +85,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              True,
              label='Clock exportieren',
              tooltip='Die PTP Clock als PipeWire-Objekt exportieren.\n'
-                     'Muss aktiviert sein damit andere Module sie nutzen können.',
+                     'Must be enabled for other modules to use it.',
              section='PTP Clock'),
 
     # ── RT-Modul (Expert) ──────────────────────────────────────
@@ -93,30 +93,30 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'nice.level'), 'int',
              -11,
              label='Nice-Level',
-             tooltip='Nice-Wert für Echtzeit-Threads.\n'
-                     'Negativ = höhere Priorität.',
+             tooltip='Nice value for real-time threads.\n'
+                     'Negative = higher priority.',
              section='Expert', advanced=True,
              min_val=-20, max_val=19),
     ParamDef('rt.prio', 'libpipewire-module-rt',
              ('args', 'rt.prio'), 'int',
              83,
-             label='RT-Priorität',
-             tooltip='Echtzeit-Thread-Priorität (1-99).\n'
-                     'Höher = wichtigere Threads.',
+             label='RT Priority',
+             tooltip='Real-time thread priority (1-99).\n'
+                     'Higher = more important threads.',
              section='Expert', advanced=True,
              min_val=1, max_val=99),
     ParamDef('rlimits.enabled', 'libpipewire-module-rt',
              ('args', 'rlimits.enabled'), 'bool',
              True,
              label='rlimits aktivieren',
-             tooltip='Ressourcenlimits für Echtzeit-Threads aktivieren.',
+             tooltip='Enable resource limits for real-time threads.',
              section='Expert', advanced=True),
     ParamDef('rtkit.enabled', 'libpipewire-module-rt',
              ('args', 'rtkit.enabled'), 'bool',
              False,
              label='RTKit aktivieren',
-             tooltip='RTKit-DBus-Service für Echtzeit-Priorität verwenden.\n'
-                     'Alternativ zu normalen rlimits.',
+             tooltip='Use RTKit D-Bus service for real-time priority.\n'
+                     'Alternative to regular rlimits.',
              section='Expert', advanced=True),
 
     # ── RTP SAP Input ──────────────────────────────────────────
@@ -124,21 +124,21 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'local.ifname'), 'interface',
              'eth0',
              label='Netzwerk-Interface (SAP)',
-             tooltip='Netzwerkschnittstelle für den SAP-Empfang.\n'
-                     'Auf dieser Schnittstelle wird nach AES67-Streams gesucht.',
+             tooltip='Network interface for SAP reception.\n'
+                     'AES67 streams are discovered on this interface.',
              section='RTP SAP Input'),
     ParamDef('sap.ip', 'libpipewire-module-rtp-sap',
              ('args', 'sap.ip'), 'ip',
              '239.255.255.255',
              label='SAP Multicast-IP',
-             tooltip='SAP-Ankündigungs-Multicast-Adresse.\n'
+             tooltip='SAP announcement multicast address.\n'
                      'Standard: 239.255.255.255',
              section='RTP SAP Input'),
     ParamDef('sap.port', 'libpipewire-module-rtp-sap',
              ('args', 'sap.port'), 'port',
              9875,
              label='SAP Port',
-             tooltip='SAP-Ankündigungs-Port.\n'
+             tooltip='SAP announcement port.\n'
                      'Standard: 9875',
              section='RTP SAP Input',
              min_val=1, max_val=65535),
@@ -146,7 +146,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'net.ttl'), 'int',
              32,
              label='SAP TTL',
-             tooltip='Time-To-Live für SAP-Pakete.\n'
+             tooltip='Time-to-live for SAP packets.\n'
                      '1 = lokales Subnetz, 32 = Site.',
              section='RTP SAP Input',
              min_val=1, max_val=255),
@@ -154,22 +154,22 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'net.loop'), 'bool',
              False,
              label='Loopback (SAP)',
-             tooltip='Loopback für SAP-Pakete aktivieren.\n'
-                     'Normalerweise deaktiviert.',
+             tooltip='Enable loopback for SAP packets.\n'
+                     'Normalerweise disabled.',
              section='RTP SAP Input'),
     ParamDef('ptp.management-socket', 'libpipewire-module-rtp-sap',
              ('args', 'ptp.management-socket'), 'string',
              '"/var/run/ptp4lro"',
              label='PTP Management Socket',
-             tooltip='UNIX-Socket für PTP-Management-Nachrichten.\n'
-                     'Nur nötig bei ptp4l Version 4.',
+             tooltip='UNIX socket for PTP management messages.\n'
+                     'Only required for ptp4l version 4.',
              section='RTP SAP Input'),
     ParamDef('sap.sess.latency.msec', 'libpipewire-module-rtp-sap',
              ('args', 'sess.latency.msec'), 'int',
              3,
              label='SAP Latenz (ms)',
-             tooltip='Latenzpuffer für empfangene AES67-Streams in ms.\n'
-                     'Nur Integer-Werte. Niedriger = weniger Latenz aber riskanter.',
+             tooltip='Latency buffer for received AES67 streams in ms.\n'
+                     'Integer values only. Lower = less latency but more risky.',
              section='RTP SAP Input',
              min_val=1, max_val=100),
 
@@ -178,21 +178,21 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'local.ifname'), 'interface',
              'eth0',
              label='Netzwerk-Interface (Sink)',
-             tooltip='Netzwerkschnittstelle für den AES67-Stream-Ausgang.',
+             tooltip='Network interface for AES67 stream output.',
              section='RTP Sink Output'),
     ParamDef('destination.ip', 'libpipewire-module-rtp-sink',
              ('args', 'destination.ip'), 'ip',
              '239.69.150.243',
              label='Ziel Multicast-IP',
-             tooltip='Ziel-Multicast-IP für den AES67-Stream.\n'
-                     '239.69.x.x Bereich für AES67 empfohlen.\n'
+             tooltip='Destination multicast IP for the AES67 stream.\n'
+                     '239.69.x.x range recommended for AES67.\n'
                      'Bei mehreren Sinks: andere IP pro Stream.',
              section='RTP Sink Output'),
     ParamDef('destination.port', 'libpipewire-module-rtp-sink',
              ('args', 'destination.port'), 'port',
              5004,
              label='Ziel Port',
-             tooltip='Ziel-Port für den AES67-Stream.\n'
+             tooltip='Destination port for the AES67 stream.\n'
                      'Standard: 5004',
              section='RTP Sink Output',
              min_val=1, max_val=65535),
@@ -200,30 +200,30 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'net.mtu'), 'int',
              1280,
              label='MTU',
-             tooltip='Maximum Transmission Unit für RTP-Pakete.\n'
-                     '1280 = sicher für die meisten Netzwerke.',
+             tooltip='Maximum Transmission Unit for RTP packets.\n'
+                     '1280 = safe for most networks.',
              section='RTP Sink Output',
              min_val=576, max_val=9000, step=100),
     ParamDef('sink.net.ttl', 'libpipewire-module-rtp-sink',
              ('args', 'net.ttl'), 'int',
              32,
              label='TTL (Sink)',
-             tooltip='Time-To-Live für RTP-Stream.\n'
-                     '1 = nur lokales Subnetz.',
+             tooltip='Time-to-live for RTP stream.\n'
+                     '1 = local subnet only.',
              section='RTP Sink Output',
              min_val=1, max_val=255),
     ParamDef('sink.net.loop', 'libpipewire-module-rtp-sink',
              ('args', 'net.loop'), 'bool',
              False,
              label='Loopback (Sink)',
-             tooltip='Loopback für RTP-Stream aktivieren.',
+             tooltip='Enable loopback for RTP stream.',
              section='RTP Sink Output'),
     ParamDef('sess.min-ptime', 'libpipewire-module-rtp-sink',
              ('args', 'sess.min-ptime'), 'int',
              1,
              label='Min Packet-Time (ms)',
              tooltip='Minimale Paketdauer in ms.\n'
-                     'Sollte gleich max-ptime sein.',
+                     'Should equal max-ptime.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
     ParamDef('sess.max-ptime', 'libpipewire-module-rtp-sink',
@@ -231,7 +231,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              1,
              label='Max Packet-Time (ms)',
              tooltip='Maximale Paketdauer in ms.\n'
-                     '1 ms funktioniert mit den meisten Geräten.',
+                     '1 ms works with most devices.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
     ParamDef('sess.name', 'libpipewire-module-rtp-sink',
@@ -239,7 +239,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              '"PipeWire RTP stream"',
              label='Session-Name',
              tooltip='Name des AES67-Streams.\n'
-                     'Bei mehreren Sinks: eindeutigen Namen vergeben.',
+                     'For multiple sinks: use unique names.',
              section='RTP Sink Output'),
     ParamDef('sess.media', 'libpipewire-module-rtp-sink',
              ('args', 'sess.media'), 'string',
@@ -251,14 +251,14 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'sess.ts-refclk'), 'string',
              '"ptp=traceable"',
              label='Timestamp-Referenz-Clock',
-             tooltip='Referenz-Clock für RTP-Timestamps.\n'
+             tooltip='Reference clock for RTP timestamps.\n'
                      '"ptp=traceable" = PTP-synchronisiert.',
              section='RTP Sink Output'),
     ParamDef('sess.ts-offset', 'libpipewire-module-rtp-sink',
              ('args', 'sess.ts-offset'), 'int',
              0,
              label='Timestamp-Offset',
-             tooltip='Offset für RTP-Timestamps in ms.',
+             tooltip='Offset for RTP timestamps in ms.',
              section='RTP Sink Output',
              min_val=-1000, max_val=1000),
     ParamDef('sess.ts-direct', 'libpipewire-module-rtp-sink',
@@ -272,7 +272,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'sess.latency.msec'), 'int',
              3,
              label='Sink Latenz (ms)',
-             tooltip='Latenzpuffer für den ausgehenden AES67-Stream in ms.\n'
+             tooltip='Latency buffer for the outgoing AES67 stream in ms.\n'
                      'Nur Integer-Werte.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
@@ -290,14 +290,14 @@ CONFIG_PARAMS: list[ParamDef] = [
              label='Sample-Rate',
              tooltip='Abfastrate in Hz.\n'
                      'AES67-kompatibel: 48000 (Standard).\n'
-                     '96000 ebenfalls möglich.',
+                     '96000 also possible.',
              section='RTP Sink Output',
              choices=[48000, 96000]),
     ParamDef('audio.channels', 'libpipewire-module-rtp-sink',
              ('args', 'audio.channels'), 'int',
              2,
-             label='Kanäle',
-             tooltip='Anzahl Audiokanäle im Stream.\n'
+             label='Channels',
+             tooltip='Number of audio channels in the stream.\n'
                      '2 = Stereo.',
              section='RTP Sink Output',
              min_val=1, max_val=64),
@@ -305,8 +305,8 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'node.channel-names'), 'multiline',
              '["CH1", "CH2"]',
              label='Kanalnamen',
-             tooltip='Namen der Audiokanäle.\n'
-                     'Für AES67-Empfänger sichtbar.\n'
+             tooltip='Names of the audio channels.\n'
+                     'Visible to AES67 receivers.\n'
                      'Format: ["CH1", "CH2", ...]',
              section='RTP Sink Output'),
 
@@ -316,27 +316,27 @@ CONFIG_PARAMS: list[ParamDef] = [
              '"rtp-sink"',
              label='Node-Name (Props)',
              tooltip='PipeWire-Node-Name des AES67-Streams.\n'
-                     'Bei mehreren Sinks: eindeutigen Namen vergeben.',
+                     'For multiple sinks: use unique names.',
              section='RTP Sink Output'),
     ParamDef('sp.node.always-process', 'libpipewire-module-rtp-sink',
              ('args', 'stream.props', 'node.always-process'), 'bool',
              True,
-             label='Immer verarbeiten',
-             tooltip='Node immer aktiv halten, auch ohne Verbindung.',
+             label='Always Process',
+             tooltip='Keep the node always active, even without a connection.',
              section='RTP Sink Output'),
     ParamDef('sp.rtp.ntp', 'libpipewire-module-rtp-sink',
              ('args', 'stream.props', 'rtp.ntp'), 'int',
              0,
              label='RTP NTP-Modus',
-             tooltip='NTP-Modus für RTP-Timestamps.\n'
-                     '0 = automatisch.',
+             tooltip='NTP mode for RTP timestamps.\n'
+                     '0 = automatic.',
              section='RTP Sink Output',
              min_val=0, max_val=3),
     ParamDef('sp.rtp.fetch-ts-refclk', 'libpipewire-module-rtp-sink',
              ('args', 'stream.props', 'rtp.fetch-ts-refclk'), 'bool',
              True,
-             label='Referenz-Clock abrufen',
-             tooltip='PTP-Referenz-Clock für Timestamps automatisch abrufen.',
+             label='Fetch Reference Clock',
+             tooltip='Automatically fetch the PTP reference clock for timestamps.',
              section='RTP Sink Output'),
 ]
 

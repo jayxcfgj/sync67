@@ -1,4 +1,4 @@
-"""PTP4L Config Editor Dialog – 7 Tabs für /etc/linuxptp/ptp4l.conf."""
+"""PTP4L Config Editor Dialog – 7 tabs for /etc/linuxptp/ptp4l.conf."""
 
 import subprocess
 import re
@@ -237,7 +237,7 @@ class PTP4LConfigDialog(QDialog):
         for section in SECTION_ORDER:
             self._create_tab(section, tab_names.get(section, section))
 
-        self._has_changes = False  # initial loading sollte nicht als change zählen
+        self._has_changes = False  # initial loading should not mark as changed
 
         layout.addWidget(self.tabs)
 

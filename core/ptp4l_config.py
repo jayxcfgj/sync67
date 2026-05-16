@@ -82,7 +82,7 @@ class PTP4LConfig:
         return True
 
     def get_comment_state(self, key):
-        """Gibt zurück ob ein Parameter auskommentiert ist."""
+        """Returns whether a parameter is commented out."""
         idx = self._line_map.get(key)
         if idx is None:
             return False

@@ -28,7 +28,7 @@ class PTPTab(QWidget):
         self.interface_combo.setMinimumWidth(200)
         interface_layout.addRow("Interface:", self.interface_combo)
 
-        self.settings_btn = QPushButton("Settings")
+        self.settings_btn = QPushButton("Start Options")
         self.settings_btn.clicked.connect(self.open_settings)
         interface_layout.addRow("", self.settings_btn)
 

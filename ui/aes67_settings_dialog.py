@@ -1,4 +1,4 @@
-"""AES67 Config Editor Dialog – 4 Tabs mit dynamischen Widgets."""
+"""AES67 Config Editor Dialog – 4 tabs with dynamic widgets."""
 
 import os
 import subprocess

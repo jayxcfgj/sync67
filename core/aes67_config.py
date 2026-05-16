@@ -285,7 +285,7 @@ class AES67Config:
     def _find_block_range(self, target_key):
         """Findet Start/End-Zeilen eines Blocks anhand eines Key-Worts
         (z.B. 'stream.rules'). Scannt _raw_lines nach key = [  oder key = {.
-        Gibt (start, end) oder (None, None) zurück.
+        Returns (start, end) or (None, None).
         """
         for start, line in enumerate(self._raw_lines):
             stripped = line.strip()
@@ -309,7 +309,7 @@ class AES67Config:
     def get_raw_block(self, *keys):
         """Extrahiert Rohtext für einen verschachtelten Block
         (z.B. stream.rules) aus _raw_lines.
-        Gibt (start_idx, end_idx, text) oder (None, None, None) zurück.
+        Returns (start_idx, end_idx, text) or (None, None, None).
         """
         if len(keys) < 2:
             return None, None, None
