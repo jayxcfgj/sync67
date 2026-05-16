@@ -17,8 +17,8 @@ _PW_META = '/usr/bin/pw-metadata'
 
 
 def _user_env():
-    """Gibt ein Environment-Dict zurück, das auf den eigentlichen User
-    zeigt (nicht root), damit PipeWire-Socket und D-Bus erreichbar sind."""
+    """Returns an env dict pointing to the actual user (not root),
+    so PipeWire socket and D-Bus are reachable."""
     env = os.environ.copy()
     sudo_uid = os.environ.get('SUDO_UID')
     if sudo_uid:
@@ -369,7 +369,7 @@ class PipeWireTab(QWidget):
         else:
             header_idx = headers[-1]  # letzten Header nehmen (2. Iteration)
 
-        # Nodes parsen (ab dem letzten Header bis Ende oder nächstem Header)
+        # Parse nodes (from last header to end or next header)
         nodes = []
         for line in lines[header_idx + 1:]:
             if not line.strip():
@@ -395,7 +395,7 @@ class PipeWireTab(QWidget):
     def _parse_pwtop_line(self, line):
         """Parst eine pw-top Datenzeile via Split bei 2+ Leerzeichen.
         Das ist robuster als Fixed-Width, weil Spalten-Positionen
-        zwischen pw-top Versionen variieren können."""
+        may vary between pw-top versions."""
         parts = re.split(r'\s{2,}', line)
         if len(parts) < 9:
             return None
@@ -625,7 +625,7 @@ class PipeWireTab(QWidget):
             self._update_latency()
 
     def _read_metadata_value(self, key):
-        """Liest einen pw-metadata-Wert. Gibt int oder None zurück."""
+        """Reads a pw-metadata value. Returns int or None."""
         # Für force-fähige Keys zuerst die force-Version versuchen
         keys = [key]
         if 'quantum' in key:

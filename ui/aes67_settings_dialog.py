@@ -59,7 +59,7 @@ def _add_quotes(s):
 # ── Widget Factory ─────────────────────────────────────────────
 
 class ParamWidget:
-    """Wrapper für ein Parameter-Widget + Default-Anzeige."""
+    """Wrapper for a parameter widget + default display."""
 
     def __init__(self, param_def, widget, default_label):
         self.defn = param_def
@@ -339,7 +339,7 @@ def create_widget(param_def, current_value):
 # ── RTP Sink Tab Widget (Multi-Instanz) ────────────────────────
 
 class RtpSinkTabWidget(QWidget):
-    """Einzelner Tab für eine rtp-sink Instanz."""
+    """Single tab for one rtp-sink instance."""
 
     def __init__(self, config, sink_index, parent=None):
         super().__init__(parent)
@@ -383,7 +383,7 @@ class RtpSinkTabWidget(QWidget):
 # ── Hauptdialog ────────────────────────────────────────────────
 
 class AES67SettingsDialog(QDialog):
-    """Config-Editor für pipewire-aes67.conf."""
+    """Config editor for pipewire-aes67.conf."""
 
     def __init__(self, config: AES67Config, parent=None):
         super().__init__(parent)
@@ -583,7 +583,7 @@ class AES67SettingsDialog(QDialog):
         self.tabs.addTab(scroll, 'RTP SAP Input')
 
     def _create_sink_tab(self):
-        """RTP Sink Output Tab mit Multi-Instanz-Unterstützung."""
+        """RTP Sink Output Tab with multi-instance support."""
         # Container with sink tab widget and add/remove buttons
         container = QWidget()
         layout = QVBoxLayout(container)

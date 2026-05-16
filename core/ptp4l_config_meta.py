@@ -1,4 +1,4 @@
-"""Parameter-Definitionen für /etc/linuxptp/ptp4l.conf."""
+"""Parameter definitions for /etc/linuxptp/ptp4l.conf."""
 
 
 class ParamDef:
@@ -68,7 +68,7 @@ CONFIG_PARAMS = [
              section='Quick'),
     ParamDef('logSyncInterval', 'choice', 0,
              label='Sync Interval',
-             tooltip='Intervall der Sync-Nachrichten.\nWert = log2(Interval in Sekunden).\n0 = 1 Hz (1 s), -3 = 128 Hz.',
+             tooltip='Interval of sync messages.\nValue = log2(interval in seconds).\n0 = 1 Hz (1 s), -3 = 128 Hz.',
              section='Quick',
              choices=[-3, -2, -1, 0, 1, 2, 3, 4]),
     ParamDef('logMinDelayReqInterval', 'choice', 0,
@@ -96,7 +96,7 @@ CONFIG_PARAMS = [
     ParamDef('utc_offset', 'int', 37,
              label='UTC Offset',
              tooltip='TAI-UTC Offset in Sekunden.\n'
-                     'Wird automatic aktualisiert wenn bekannt.',
+                     'Updated automatically when known.',
              section='Default', min_val=0, max_val=60),
     ParamDef('clockClass', 'int', 248,
              label='Clock Class',
@@ -145,7 +145,7 @@ CONFIG_PARAMS = [
     # ── Port Data Set ────────────────────────────────────────
     ParamDef('logAnnounceInterval', 'choice', 1,
              label='Announce Interval',
-             tooltip='Intervall der Announce-Nachrichten.\n1 = 0.5 Hz (alle 2 s).',
+             tooltip='Interval of announce messages.\n1 = 0.5 Hz (every 2 s).',
              section='Port',
              choices=[-3, -2, -1, 0, 1, 2, 3, 4]),
     ParamDef('operLogSyncInterval', 'int', 0,
@@ -187,7 +187,7 @@ CONFIG_PARAMS = [
              section='Port', min_val=0, max_val=7),
     ParamDef('neighborPropDelayThresh', 'int', 20000000,
              label='Neighbor Prop Delay Threshold',
-             tooltip='Maximale Nachbarschafts-Laufzeit in ns.\n20 ms = typischer Schwellwert.',
+             tooltip='Maximum neighbor propagation delay in ns.\n20 ms = typical threshold.',
              section='Port', min_val=0, max_val=100000000),
     ParamDef('serverOnly', 'bool', 0,
              label='Server Only',
@@ -221,12 +221,12 @@ CONFIG_PARAMS = [
              section='Port'),
     ParamDef('ignore_source_id', 'bool', 0,
              label='Ignore Source ID',
-             tooltip='Source-ID von PTP-Nachrichten ignorieren.\n'
+             tooltip='Ignore source ID of PTP messages.\n'
                      'Useful with proprietary implementations.',
              section='Port'),
     ParamDef('power_profile.2011.grandmasterTimeInaccuracy', 'int', -1,
              label='Power Profile GM Time Inaccuracy',
-             tooltip='Grandmaster-Zeitungenauigkeit (IEC 61850-9-3).\n-1 = nicht gesetzt.',
+             tooltip='Grandmaster time inaccuracy (IEC 61850-9-3).\n-1 = not set.',
              section='Port', min_val=-1, max_val=100000),
     ParamDef('power_profile.2011.networkTimeInaccuracy', 'int', -1,
              label='Power Profile Network Time Inaccuracy',
@@ -303,7 +303,7 @@ CONFIG_PARAMS = [
              section='Runtime'),
     ParamDef('unicast_master_table', 'int', 0,
              label='Unicast Master Table',
-             tooltip='Tabelle der Unicast-Master.\n0 = disabled.',
+             tooltip='Table of unicast masters.\n0 = disabled.',
              section='Runtime', min_val=0, max_val=255),
     ParamDef('unicast_req_duration', 'int', 3600,
              label='Unicast Request Duration',
@@ -400,7 +400,7 @@ CONFIG_PARAMS = [
              section='Servo', min_val=0, max_val=15),
     ParamDef('msg_interval_request', 'int', 0,
              label='Message Interval Request',
-             tooltip='Angefordertes Nachrichtenintervall.\n0 = Standard.',
+             tooltip='Requested message interval.\n0 = default.',
              section='Servo', min_val=-128, max_val=127),
     ParamDef('servo_num_offset_values', 'int', 10,
              label='Servo Offset Values',
@@ -412,7 +412,7 @@ CONFIG_PARAMS = [
              section='Servo', min_val=0, max_val=1000000),
     ParamDef('write_phase_mode', 'bool', 0,
              label='Write Phase Mode',
-             tooltip='Phasenkorrektur-Modus aktivieren.\n'
+             tooltip='Enable phase correction mode.\n'
                      'Useful for PTP-capable NICs that support phase adjustment.',
              section='Servo'),
 

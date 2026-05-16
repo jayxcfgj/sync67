@@ -104,7 +104,7 @@ class AES67Config:
         self._parse()
         if not self._data:
             raise ConfigParseError(
-                f"Konnte keine Sektionen in {self._loaded_path} parsen"
+                f"Could not parse any sections in {self._loaded_path}"
             )
 
     def save(self, path=None):
@@ -307,7 +307,7 @@ class AES67Config:
         return None, None
 
     def get_raw_block(self, *keys):
-        """Extrahiert Rohtext für einen verschachtelten Block
+        """Extracts raw text for a nested block
         (z.B. stream.rules) aus _raw_lines.
         Returns (start_idx, end_idx, text) or (None, None, None).
         """
@@ -321,7 +321,7 @@ class AES67Config:
         return start, end, '\n'.join(lines)
 
     def set_raw_block(self, text, *keys):
-        """Ersetzt Rohtext für einen Block (z.B. stream.rules).
+        """Replaces raw text for a block (e.g. stream.rules).
         text muss den kompletten Block inkl. Header-Zeile enthalten.
         """
         if len(keys) < 2:
