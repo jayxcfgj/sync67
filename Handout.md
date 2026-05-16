@@ -130,11 +130,16 @@ Beispiel:
 # Aktueller Implementierungsstand
 
 - PTP Tab vollständig funktional mit:
-  * Netzwerkinterface auswählen (via `ip link show`)
+  * Netzwerkinterface auswählen (via `ip link show`) + Auswahl wird via QSettings gemerkt
   * ptp4l starten/stoppen
   * Live-Log anzeigen
   * Sync-Status anzeigen (visuelle Ampel-Anzeige)
-  * Settings-Dialog für ethtool/ip link Konfiguration (gro, gso, tso, sg, rx-usecs, multicast)
+  * Start Options-Dialog für ethtool/ip link Konfiguration (gro, gso, tso, sg, rx-usecs, multicast)
+  * **PTP4L Config Editor**: GUI-Editor für `/etc/linuxptp/ptp4l.conf`
+    * 119 Parameter in 7 Tabs (Quick, Main, Port, Runtime, Servo, Transport, Interface)
+    * Quick-Tab mit 10 wichtigsten Parametern
+    * Format-erhaltender Parser, Reset Config Button
+    * Tooltips + Default-Anzeige + Deviation-Highlighting
   * Trennung von UI und Systemlogik (UI → Service Layer → Systemprozess)
 - AES67 Tab vollständig funktional mit:
   * Start/Stop Buttons für `pipewire-aes67`
@@ -173,10 +178,12 @@ Beispiel:
 
 ## ✅ PTP Tab (MVP 0.1 – abgeschlossen)
 
-* Netzwerkinterface auswählen
+* Netzwerkinterface auswählen (Auswahl gespeichert)
 * ptp4l starten/stoppen
 * Live-Log anzeigen
 * Sync-Status anzeigen (Ampel)
+* Start Options für ethtool-Optimierung
+* **PTP4L Config Editor** (119 Parameter, 7 Tabs, Quick-Tab)
 
 ## ✅ AES67 Tab (MVP 0.2 – abgeschlossen)
 
