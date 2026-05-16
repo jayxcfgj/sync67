@@ -197,10 +197,19 @@ def create_widget(param_def, current_value):
     layout.addWidget(label)
 
     # Default value display
-    default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
+    if param_def.type == 'bool':
+        default_val = param_def.default
+        if isinstance(default_val, bool):
+            default_text = 'Default: checked' if default_val else 'Default: unchecked'
+        elif isinstance(default_val, int):
+            default_text = 'Default: checked' if default_val else 'Default: unchecked'
+        else:
+            default_text = 'Default: checked' if str(default_val) in ('1', 'true', 'True') else 'Default: unchecked'
+    else:
+        default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
     default_label = QLabel(default_text)
     default_label.setStyleSheet('color: gray; font-size: 10px;')
-    default_label.setToolTip(tooltip)
+
 
     # Widget
     if ptype == 'string':
@@ -538,7 +547,7 @@ class AES67SettingsDialog(QDialog):
             self.widgets[pdef.key] = pw
 
         # System-Clock Checkbox (special handling)
-        self.system_clock_cb = QCheckBox('System-Clock verwenden (PHC deaktivieren)')
+        self.system_clock_cb = QCheckBox('Use System Clock (disable PHC)')
         self.system_clock_cb.setToolTip(
             'Wenn aktiviert: clock.interface wird auskommentiert.\n'
             'Die System-Clock wird statt der PHC verwendet.\n'
@@ -762,7 +771,7 @@ class AES67SettingsDialog(QDialog):
             self, 'Reset Config',
             'Are you sure? Your config will be replaced by the\n'
             'default config from /usr/share/pipewire/pipewire-aes67.conf.\n'
-            'Ein Backup wird als .bak gespeichert.',
+            'A backup will be saved as .bak.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply != QMessageBox.StandardButton.Yes:

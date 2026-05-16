@@ -1,4 +1,4 @@
-"""Metadaten für alle Parameter der pipewire-aes67.conf."""
+"""Metadata for all parameters of pipewire-aes67.conf."""
 
 from typing import Any
 
@@ -35,10 +35,9 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('clock.interface', 'context.objects',
              ('args', 'clock.interface'), 'interface',
              '"eth0"',
-             label='Netzwerk-Interface (PHC)',
+             label='Network Interface (PHC)',
              tooltip='Network interface for the PTP Hardware Clock (PHC).\n'
-                     'Used to automatically find the matching /dev/ptpX.\n'
-                     'If issues: enable "Use System Clock".',
+                     'Select the same interface as configured in the PTP tab.',
              section='PTP Clock'),
     ParamDef('clock.device', 'context.objects',
              ('args', 'clock.device'), 'string',
@@ -74,9 +73,9 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('resync.ms', 'context.objects',
              ('args', 'resync.ms'), 'float',
              1.5,
-             label='Resync-Intervall (ms)',
+             label='Resync Interval (ms)',
              tooltip='Zeitraum in ms nach dem eine Neu-Synchronisation\n'
-                     'der Clock erzwungen wird.\n'
+                     'of the clock is forced.\n'
                      'Lower = more frequent resyncs.',
              section='PTP Clock',
              min_val=0.1, max_val=60.0, step=0.1),
@@ -108,13 +107,13 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('rlimits.enabled', 'libpipewire-module-rt',
              ('args', 'rlimits.enabled'), 'bool',
              True,
-             label='rlimits aktivieren',
+             label='Enable rlimits',
              tooltip='Enable resource limits for real-time threads.',
              section='Expert', advanced=True),
     ParamDef('rtkit.enabled', 'libpipewire-module-rt',
              ('args', 'rtkit.enabled'), 'bool',
              False,
-             label='RTKit aktivieren',
+             label='Enable RTKit',
              tooltip='Use RTKit D-Bus service for real-time priority.\n'
                      'Alternative to regular rlimits.',
              section='Expert', advanced=True),
@@ -123,14 +122,14 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('sap.local.ifname', 'libpipewire-module-rtp-sap',
              ('args', 'local.ifname'), 'interface',
              'eth0',
-             label='Netzwerk-Interface (SAP)',
+             label='Network Interface (SAP)',
              tooltip='Network interface for SAP reception.\n'
-                     'AES67 streams are discovered on this interface.',
+                     'Select the same interface as configured in the PTP tab.',
              section='RTP SAP Input'),
     ParamDef('sap.ip', 'libpipewire-module-rtp-sap',
              ('args', 'sap.ip'), 'ip',
              '239.255.255.255',
-             label='SAP Multicast-IP',
+             label='SAP Multicast IP',
              tooltip='SAP announcement multicast address.\n'
                      'Standard: 239.255.255.255',
              section='RTP SAP Input'),
@@ -167,7 +166,7 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('sap.sess.latency.msec', 'libpipewire-module-rtp-sap',
              ('args', 'sess.latency.msec'), 'int',
              3,
-             label='SAP Latenz (ms)',
+             label='SAP Latency (ms)',
              tooltip='Latency buffer for received AES67 streams in ms.\n'
                      'Integer values only. Lower = less latency but more risky.',
              section='RTP SAP Input',
@@ -177,13 +176,14 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('sink.local.ifname', 'libpipewire-module-rtp-sink',
              ('args', 'local.ifname'), 'interface',
              'eth0',
-             label='Netzwerk-Interface (Sink)',
-             tooltip='Network interface for AES67 stream output.',
+             label='Network Interface (Sink)',
+             tooltip='Network interface for AES67 stream output.\n'
+                     'Select the same interface as configured in the PTP tab.',
              section='RTP Sink Output'),
     ParamDef('destination.ip', 'libpipewire-module-rtp-sink',
              ('args', 'destination.ip'), 'ip',
              '239.69.150.243',
-             label='Ziel Multicast-IP',
+             label='Destination Multicast IP',
              tooltip='Destination multicast IP for the AES67 stream.\n'
                      '239.69.x.x range recommended for AES67.\n'
                      'Bei mehreren Sinks: andere IP pro Stream.',
@@ -250,7 +250,7 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('sess.ts-refclk', 'libpipewire-module-rtp-sink',
              ('args', 'sess.ts-refclk'), 'string',
              '"ptp=traceable"',
-             label='Timestamp-Referenz-Clock',
+             label='Timestamp Reference Clock',
              tooltip='Reference clock for RTP timestamps.\n'
                      '"ptp=traceable" = PTP-synchronisiert.',
              section='RTP Sink Output'),
@@ -266,12 +266,12 @@ CONFIG_PARAMS: list[ParamDef] = [
              False,
              label='Direkte Timestamps',
              tooltip='RTP-Timestamps direkt gegen PTP-synchronisierten Driver.\n'
-                     'Kann Latenz reduzieren wenn Referenz-Clocks identisch sind.',
+                     'Can reduce latency when reference clocks match.',
              section='RTP Sink Output'),
     ParamDef('sink.sess.latency.msec', 'libpipewire-module-rtp-sink',
              ('args', 'sess.latency.msec'), 'int',
              3,
-             label='Sink Latenz (ms)',
+             label='Sink Latency (ms)',
              tooltip='Latency buffer for the outgoing AES67 stream in ms.\n'
                      'Nur Integer-Werte.',
              section='RTP Sink Output',
@@ -304,7 +304,7 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('node.channel-names', 'libpipewire-module-rtp-sink',
              ('args', 'node.channel-names'), 'multiline',
              '["CH1", "CH2"]',
-             label='Kanalnamen',
+             label='Channel Names',
              tooltip='Names of the audio channels.\n'
                      'Visible to AES67 receivers.\n'
                      'Format: ["CH1", "CH2", ...]',
@@ -343,7 +343,7 @@ CONFIG_PARAMS: list[ParamDef] = [
 # ── Lookup-Map ─────────────────────────────────────────────────
 PARAM_MAP: dict[str, ParamDef] = {p.key: p for p in CONFIG_PARAMS}
 
-# ── Section-Order für Tabs ─────────────────────────────────────
+# ── Section Order ──────────────────────────────────────────────
 SECTION_ORDER = [
     'PTP Clock',
     'RTP SAP Input',

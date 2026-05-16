@@ -100,10 +100,18 @@ def create_widget(param_def, current_value, on_change=None):
     label.setToolTip(tooltip)
     layout.addWidget(label)
 
-    default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
+    if param_def.type == 'bool':
+        dv = param_def.default
+        if isinstance(dv, bool):
+            default_text = 'Default: checked' if dv else 'Default: unchecked'
+        elif isinstance(dv, int):
+            default_text = 'Default: checked' if dv else 'Default: unchecked'
+        else:
+            default_text = 'Default: checked' if str(dv) in ('1', 'true', 'True') else 'Default: unchecked'
+    else:
+        default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
     default_label = QLabel(default_text)
     default_label.setStyleSheet('color: gray; font-size: 10px;')
-    default_label.setToolTip(tooltip)
 
     if ptype == 'bool':
         w = QCheckBox()
