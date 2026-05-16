@@ -16,6 +16,11 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
 - ptp4l start/stop with live terminal output
 - Sync status indicator (traffic light: green ≤200ns, yellow ≤1000ns, red)
 - ethtool/ip link optimization settings (gro, gso, tso, sg, rx-usecs, multicast)
+- **PTP4L Config Editor**: full GUI editor for `/etc/linuxptp/ptp4l.conf`
+  - 119 parameters across 7 tabs (Quick, Default, Port, Runtime, Servo, Transport, Interface)
+  - Quick tab with 10 essential parameters
+  - Format-preserving parser, Reset Config button
+  - Deviation highlighting, tooltips, dark theme
 
 ### AES67 Tab
 - pipewire-aes67 start/stop with live terminal output
@@ -90,6 +95,9 @@ sync67/
 ├── core/
 │   ├── aes67_config.py      # SPA config parser/serializer
 │   ├── aes67_config_meta.py # Parameter definitions (~40 params)
+│   ├── ptp4l_config.py      # PTP4L config parser/serializer
+│   ├── ptp4l_config_meta.py # Parameter definitions (~119 params)
+│   ├── ptp4l_default.cfg    # Default PTP4L config for reset
 │   └── version.py           # Version, app info, license
 ├── ui/
 │   ├── main_window.py       # Main window with tab widget
@@ -99,6 +107,7 @@ sync67/
 │   ├── pipewire_tab.py      # PipeWire monitoring tab
 │   ├── session_tab.py       # Session management tab
 │   ├── about_dialog.py      # About dialog
+│   ├── ptp4l_config_dialog.py # PTP4L config editor dialog
 │   └── settings_dialog.py   # PTP ethtool settings
 ├── docs/
 │   ├── mvp.md               # MVP roadmap

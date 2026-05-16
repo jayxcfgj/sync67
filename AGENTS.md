@@ -55,6 +55,14 @@
 - Tabellen-Spalten: ID, Status (Running/Idle/Closed), Name, Quantum, Format, CH, DSP (Label+Mini-Bar), Waiting, Busy, Xruns, Rate
 - Read-Only (kein Selection), Spaltenbreiten via QSettings gemerkt
 
+### PTP4L Config Editor (added in MVP 0.4)
+- `core/ptp4l_config.py`: Zeilenbasierter Parser für `/etc/linuxptp/ptp4l.conf`
+- `core/ptp4l_config_meta.py`: ~119 Parameter in 7 Tabs (Quick, Default, Port, Runtime, Servo, Transport, Interface)
+- `ui/ptp4l_config_dialog.py`: QDialog mit 7 Tabs und dynamischen Widgets
+- Quick-Tab: 10 wichtigste Parameter (clientOnly, priority1/2, verbose, network_transport, time_stamping, SlaveOnly, MasterOnly, logSyncInterval, logMinDelayReqInterval)
+- Reset Config über Default-Datei `core/ptp4l_default.cfg`
+- Buttons "Open Config" und "PTP4L Config Editor" im PTP-Tab
+
 ### Session Tab (MVP 0.4)
 - `ui/session_tab.py`: Quick-Start (ptp4l + aes67), System-Status, Sync-Ampel, Versionen
 - Start-Reihenfolge: ptp4l → 2s warten → pipewire-aes67; Stop: aes67 → ptp4l
@@ -73,6 +81,8 @@
 - Pfade als Tupel (`('args', 'local.ifname')`) wegen Punkt-Tasten
 - `get_raw_block`/`set_raw_block` für Rohtext-Blöcke (stream.rules)
 - User-Einstellungen via QSettings: PTP-Interface, Tabellen-Spaltenbreiten
+- PTP4L-Config-Editor ähnlich wie AES67-Editor: `core/ptp4l_config.py`, `core/ptp4l_config_meta.py`, `ui/ptp4l_config_dialog.py`
+- App startet nur mit root-Rechten (Prüfung in main.py, `os.getuid() != 0`)
 
 ### Bekannte Einschränkungen
 - `context.spa-libs` wird geparst aber nicht im Editor angezeigt

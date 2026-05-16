@@ -5,7 +5,9 @@ from PyQt6.QtCore import Qt, QProcess, QSettings
 from PyQt6.QtGui import QFont
 import subprocess
 import re
+import shutil
 import traceback
+from pathlib import Path
 
 class PTPTab(QWidget):
     def __init__(self):
@@ -82,13 +84,24 @@ class PTPTab(QWidget):
         button_layout.addStretch()
         layout.addLayout(button_layout)
 
+        ptp4l_group = QGroupBox("PTP4L Configuration")
+        ptp4l_layout = QHBoxLayout(ptp4l_group)
+        self.ptp4l_open_btn = QPushButton("Open Config")
+        self.ptp4l_open_btn.clicked.connect(self.open_ptp4l_config)
+        self.ptp4l_edit_btn = QPushButton("PTP4L Config Editor")
+        self.ptp4l_edit_btn.clicked.connect(self.open_ptp4l_editor)
+        ptp4l_layout.addWidget(self.ptp4l_open_btn)
+        ptp4l_layout.addWidget(self.ptp4l_edit_btn)
+        ptp4l_layout.addStretch()
+        layout.addWidget(ptp4l_group)
+
         self.terminal_output = QTextEdit()
         self.terminal_output.setReadOnly(True)
         self.terminal_output.setFont(QFont("Courier New", 10))
         self.terminal_output.setStyleSheet("""
             QTextEdit {
                 background-color: #000000;
-                color: #00FF00;
+                color: #E0E0E0;
                 border: 1px solid #333333;
             }
         """)
@@ -284,3 +297,31 @@ class PTPTab(QWidget):
             self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
             self.status_light.setToolTip("Sync Status: stopped")
             self.terminal_output.append("PTP stopped.")
+
+    def open_ptp4l_config(self):
+        ptp4l_path = "/etc/linuxptp/ptp4l.conf"
+        if Path(ptp4l_path).exists():
+            self.terminal_output.append(f"Opening config: {ptp4l_path}")
+            QProcess.startDetached("xdg-open", [ptp4l_path])
+        else:
+            self.terminal_output.append(f"Config not found: {ptp4l_path}")
+
+    def open_ptp4l_editor(self):
+        ptp4l_path = "/etc/linuxptp/ptp4l.conf"
+        if not Path(ptp4l_path).exists():
+            self.terminal_output.append(f"Config not found: {ptp4l_path}")
+            return
+
+        from core.ptp4l_config import PTP4LConfig
+        from ui.ptp4l_config_dialog import PTP4LConfigDialog
+
+        try:
+            cfg = PTP4LConfig()
+            cfg.load(ptp4l_path)
+            dialog = PTP4LConfigDialog(cfg, self)
+            if dialog.exec() == PTP4LConfigDialog.DialogCode.Accepted:
+                self.terminal_output.append("PTP4L config saved.")
+        except Exception as e:
+            self.terminal_output.append(f"Error loading PTP4L config: {e}")
+            import traceback as tb
+            self.terminal_output.append(tb.format_exc())

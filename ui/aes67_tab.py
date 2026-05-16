@@ -94,7 +94,7 @@ class AES67Tab(QWidget):
         self.terminal_output.setStyleSheet("""
             QTextEdit {
                 background-color: #000000;
-                color: #00FF00;
+                color: #E0E0E0;
                 border: 1px solid #333333;
             }
         """)
