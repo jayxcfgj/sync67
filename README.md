@@ -84,7 +84,7 @@ A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/jaxcfgj/sync67.git
+git clone https://github.com/jayxcfgj/sync67.git
 ```
 
 **2. Enter the directory**
