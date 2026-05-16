@@ -87,7 +87,7 @@ class StringWidget(ParamWidget):
         self.widget.setText(str(value) if value is not None else '')
 
 
-def create_widget(param_def, current_value):
+def create_widget(param_def, current_value, on_change=None):
     ptype = param_def.type
     tooltip = param_def.tooltip
 
@@ -136,7 +136,7 @@ def create_widget(param_def, current_value):
             w.setMaximum(999999.0)
         if param_def.step is not None:
             w.setSingleStep(param_def.step)
-        w.setDecimals(6)
+        w.setDecimals(4)
         pw = FloatWidget(param_def, w, default_label)
     elif ptype == 'choice':
         w = QComboBox()
@@ -170,6 +170,8 @@ def create_widget(param_def, current_value):
             default = param_def.default
             is_dev = str(current) != str(default)
             pw.mark_deviation(is_dev)
+            if on_change:
+                on_change()
         except Exception:
             pass
 
@@ -235,6 +237,8 @@ class PTP4LConfigDialog(QDialog):
         for section in SECTION_ORDER:
             self._create_tab(section, tab_names.get(section, section))
 
+        self._has_changes = False  # initial loading sollte nicht als change zählen
+
         layout.addWidget(self.tabs)
 
         btn_layout = QHBoxLayout()
@@ -274,7 +278,7 @@ class PTP4LConfigDialog(QDialog):
         params = get_params_for_section(section)
         for pdef in params:
             val = self.config.get(pdef.key)
-            container, pw = create_widget(pdef, val)
+            container, pw = create_widget(pdef, val, on_change=self._mark_changes)
             self.widgets[pdef.key] = pw
             form.addRow(container)
 
@@ -330,8 +334,12 @@ class PTP4LConfigDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Reset failed:\n{e}')
 
+    def _mark_changes(self):
+        self._has_changes = True
+
     def _reload_widgets(self):
         for key, pw in self.widgets.items():
             val = self.config.get(key)
             if val is not None:
                 pw.set_value(val)
+        self._has_changes = False

@@ -145,12 +145,14 @@ class PTP4LConfig:
 
     def _parse_value(self, val):
         val = val.strip()
+        if val.startswith('0x'):
+            return val
         if val in ('0', '1'):
             return int(val)
         try:
             if '.' in val:
                 return float(val)
-            return int(val, 0)  # handles 0x hex
+            return int(val)
         except (ValueError, TypeError):
             pass
         return val
