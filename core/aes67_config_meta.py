@@ -49,18 +49,18 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('clock.id', 'context.objects',
              ('args', 'clock.id'), 'choice',
              None,
-             label='Clock-ID',
-             tooltip='Alternative Clock-Quelle.\n'
+             label='Clock ID',
+             tooltip='Alternative clock source.\n'
                      '"tai" = CLOCK_TAI (auch von NTP syncbar).\n'
-                     'Leer lassen = automatic via Interface/Device.',
+                     'Leave empty = automatic via interface/device.',
              section='PTP Clock',
              choices=['', 'tai']),
     ParamDef('clock.name', 'context.objects',
              ('args', 'clock.name'), 'string',
              '"clock.system.ptp0"',
-             label='Clock-Name',
-             tooltip='Name der PTP Clock.\n'
-                     'Wird von anderen Modulen referenziert.',
+             label='Clock Name',
+             tooltip='Name of the PTP clock.\n'
+                     'Referenced by other modules.',
              section='PTP Clock'),
     ParamDef('priority.driver', 'context.objects',
              ('args', 'priority.driver'), 'int',
@@ -74,7 +74,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'resync.ms'), 'float',
              1.5,
              label='Resync Interval (ms)',
-             tooltip='Zeitraum in ms nach dem eine Neu-Synchronisation\n'
+             tooltip='Interval in ms after which a re-synchronization\n'
                      'of the clock is forced.\n'
                      'Lower = more frequent resyncs.',
              section='PTP Clock',
@@ -82,8 +82,8 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('object.export', 'context.objects',
              ('args', 'object.export'), 'bool',
              True,
-             label='Clock exportieren',
-             tooltip='Die PTP Clock als PipeWire-Objekt exportieren.\n'
+             label='Export Clock',
+             tooltip='Export the PTP clock as a PipeWire object.\n'
                      'Must be enabled for other modules to use it.',
              section='PTP Clock'),
 
@@ -91,7 +91,7 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('nice.level', 'libpipewire-module-rt',
              ('args', 'nice.level'), 'int',
              -11,
-             label='Nice-Level',
+             label='Nice Level',
              tooltip='Nice value for real-time threads.\n'
                      'Negative = higher priority.',
              section='Expert', advanced=True,
@@ -131,14 +131,14 @@ CONFIG_PARAMS: list[ParamDef] = [
              '239.255.255.255',
              label='SAP Multicast IP',
              tooltip='SAP announcement multicast address.\n'
-                     'Standard: 239.255.255.255',
+                     'Default: 239.255.255.255',
              section='RTP SAP Input'),
     ParamDef('sap.port', 'libpipewire-module-rtp-sap',
              ('args', 'sap.port'), 'port',
              9875,
              label='SAP Port',
              tooltip='SAP announcement port.\n'
-                     'Standard: 9875',
+                     'Default: 9875',
              section='RTP SAP Input',
              min_val=1, max_val=65535),
     ParamDef('sap.net.ttl', 'libpipewire-module-rtp-sap',
@@ -186,14 +186,14 @@ CONFIG_PARAMS: list[ParamDef] = [
              label='Destination Multicast IP',
              tooltip='Destination multicast IP for the AES67 stream.\n'
                      '239.69.x.x range recommended for AES67.\n'
-                     'Bei mehreren Sinks: andere IP pro Stream.',
+                     'For multiple sinks: different IP per stream.',
              section='RTP Sink Output'),
     ParamDef('destination.port', 'libpipewire-module-rtp-sink',
              ('args', 'destination.port'), 'port',
              5004,
-             label='Ziel Port',
+             label='Destination Port',
              tooltip='Destination port for the AES67 stream.\n'
-                     'Standard: 5004',
+                     'Default: 5004',
              section='RTP Sink Output',
              min_val=1, max_val=65535),
     ParamDef('net.mtu', 'libpipewire-module-rtp-sink',
@@ -222,7 +222,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'sess.min-ptime'), 'int',
              1,
              label='Min Packet-Time (ms)',
-             tooltip='Minimale Paketdauer in ms.\n'
+             tooltip='Minimum packet duration in ms.\n'
                      'Should equal max-ptime.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
@@ -230,7 +230,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'sess.max-ptime'), 'int',
              1,
              label='Max Packet-Time (ms)',
-             tooltip='Maximale Paketdauer in ms.\n'
+             tooltip='Maximum packet duration in ms.\n'
                      '1 ms works with most devices.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
@@ -238,14 +238,14 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'sess.name'), 'string',
              '"PipeWire RTP stream"',
              label='Session-Name',
-             tooltip='Name des AES67-Streams.\n'
+             tooltip='Name of the AES67 stream.\n'
                      'For multiple sinks: use unique names.',
              section='RTP Sink Output'),
     ParamDef('sess.media', 'libpipewire-module-rtp-sink',
              ('args', 'sess.media'), 'string',
              '"audio"',
              label='Medien-Typ',
-             tooltip='Medientyp des Streams (meist "audio").',
+             tooltip='Media type of the stream (usually "audio").',
              section='RTP Sink Output'),
     ParamDef('sess.ts-refclk', 'libpipewire-module-rtp-sink',
              ('args', 'sess.ts-refclk'), 'string',
@@ -257,15 +257,15 @@ CONFIG_PARAMS: list[ParamDef] = [
     ParamDef('sess.ts-offset', 'libpipewire-module-rtp-sink',
              ('args', 'sess.ts-offset'), 'int',
              0,
-             label='Timestamp-Offset',
+             label='Timestamp Offset',
              tooltip='Offset for RTP timestamps in ms.',
              section='RTP Sink Output',
              min_val=-1000, max_val=1000),
     ParamDef('sess.ts-direct', 'libpipewire-module-rtp-sink',
              ('args', 'sess.ts-direct'), 'bool',
              False,
-             label='Direkte Timestamps',
-             tooltip='RTP-Timestamps direkt gegen PTP-synchronisierten Driver.\n'
+             label='Direct Timestamps',
+             tooltip='Synchronize RTP timestamps directly against the PTP driver.\n'
                      'Can reduce latency when reference clocks match.',
              section='RTP Sink Output'),
     ParamDef('sink.sess.latency.msec', 'libpipewire-module-rtp-sink',
@@ -273,7 +273,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              3,
              label='Sink Latency (ms)',
              tooltip='Latency buffer for the outgoing AES67 stream in ms.\n'
-                     'Nur Integer-Werte.',
+                     'Integer values only.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
     ParamDef('audio.format', 'libpipewire-module-rtp-sink',
@@ -281,15 +281,15 @@ CONFIG_PARAMS: list[ParamDef] = [
              '"S24BE"',
              label='Audio-Format',
              tooltip='AES67-Audio-Format.\n'
-                     'S24BE = 24 Bit Big-Endian (AES67-Standard).',
+                     'S24BE = 24-bit Big-Endian (AES67 default).',
              section='RTP Sink Output',
              choices=['"S16BE"', '"S24BE"', '"S32BE"', '"F32BE"']),
     ParamDef('audio.rate', 'libpipewire-module-rtp-sink',
              ('args', 'audio.rate'), 'choice',
              48000,
              label='Sample-Rate',
-             tooltip='Abfastrate in Hz.\n'
-                     'AES67-kompatibel: 48000 (Standard).\n'
+             tooltip='Sample rate in Hz.\n'
+                     'AES67 compatible: 48000 (default).\n'
                      '96000 also possible.',
              section='RTP Sink Output',
              choices=[48000, 96000]),
@@ -315,7 +315,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'stream.props', 'node.name'), 'string',
              '"rtp-sink"',
              label='Node-Name (Props)',
-             tooltip='PipeWire-Node-Name des AES67-Streams.\n'
+             tooltip='PipeWire node name of the AES67 stream.\n'
                      'For multiple sinks: use unique names.',
              section='RTP Sink Output'),
     ParamDef('sp.node.always-process', 'libpipewire-module-rtp-sink',

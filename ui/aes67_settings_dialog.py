@@ -26,7 +26,7 @@ from core.aes67_config_meta import (
 _IFACE_CACHE = None
 
 def _load_interfaces():
-    """Liste der Netzwerk-Interfaces (ohne lo) – gecached."""
+    """Cached list of network interfaces (excluding lo)."""
     global _IFACE_CACHE
     if _IFACE_CACHE is not None:
         return _IFACE_CACHE
@@ -551,8 +551,8 @@ class AES67SettingsDialog(QDialog):
         # System-Clock Checkbox (special handling)
         self.system_clock_cb = QCheckBox('Use System Clock (disable PHC)')
         self.system_clock_cb.setToolTip(
-            'Wenn aktiviert: clock.interface wird auskommentiert.\n'
-            'Die System-Clock wird statt der PHC verwendet.\n'
+            'When enabled: clock.interface is commented out.\n'
+            'The system clock is used instead of the PHC.\n'
             'Needed when running as root and PHC returns timestamp 0.'
         )
         # Check if clock.interface is currently commented out
