@@ -238,7 +238,7 @@ class PTP4LConfigDialog(QDialog):
         """
         self.tabs.setStyleSheet(tab_style)
 
-        tab_names = {'Quick': '⚡ Quick', 'Default': 'Default', 'Port': 'Port',
+        tab_names = {'Quick': '⚡ Quick', 'Default': 'Main', 'Port': 'Port',
                      'Runtime': 'Runtime', 'Servo': 'Servo',
                      'Transport': 'Transport', 'Interface': 'Interface'}
 

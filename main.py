@@ -12,9 +12,16 @@ def main():
         sys.exit(1)
 
     from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtGui import QIcon
+    from pathlib import Path
     from ui.main_window import MainWindow
 
     app = QApplication(sys.argv)
+
+    icon_path = str(Path(__file__).parent / 'assets' / 'icon.png')
+    if Path(icon_path).exists():
+        app.setWindowIcon(QIcon(icon_path))
+
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

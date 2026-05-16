@@ -205,6 +205,8 @@ def create_widget(param_def, current_value):
             default_text = 'Default: checked' if default_val else 'Default: unchecked'
         else:
             default_text = 'Default: checked' if str(default_val) in ('1', 'true', 'True') else 'Default: unchecked'
+    elif param_def.type == 'interface':
+        default_text = 'Default: select same as in PTP tab'
     else:
         default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
     default_label = QLabel(default_text)
@@ -640,7 +642,7 @@ class AES67SettingsDialog(QDialog):
         rules_layout = QVBoxLayout(rules_group)
 
         rules_label = QLabel(
-            'Bearbeite die SAP-Stream-Regeln direkt im SPA-Format.\n'
+            'Edit SAP stream rules directly in SPA format.\n'
             'Changes are applied on Apply.'
         )
         rules_label.setWordWrap(True)

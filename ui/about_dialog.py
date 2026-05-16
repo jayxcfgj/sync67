@@ -6,7 +6,8 @@ import sys
 
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPixmap
+from pathlib import Path
 
 from core.version import __version__, __app_name__, __description__, __license__, __author__
 
@@ -25,7 +26,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f'About {__app_name__}')
-        self.setFixedSize(400, 350)
+        self.setFixedSize(420, 480)
         self.setStyleSheet("""
             QDialog { background-color: #2b2b2b; color: #e0e0e0; }
             QLabel { color: #e0e0e0; }
@@ -36,8 +37,20 @@ class AboutDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # Hero image
+        img_path = str(Path(__file__).parent.parent / 'assets' / 'about_header.png')
+        pixmap = QPixmap(img_path)
+        if not pixmap.isNull():
+            img = QLabel()
+            img.setPixmap(pixmap.scaled(
+                380, 160, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            ))
+            img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(img)
+
         title = QLabel(__app_name__)
-        title.setFont(QFont('', 18, QFont.Weight.Bold))
+        title.setFont(QFont('', 14, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
