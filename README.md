@@ -96,18 +96,23 @@ cd sync67
 
 *Debian / Ubuntu / Linux Mint:*
 ```bash
-sudo apt install python3-pyqt6 pipewire linuxptp
+sudo apt install python3-pyqt6 linuxptp
 ```
 
 *Arch Linux:*
 ```bash
-sudo pacman -S python-pyqt6 pipewire linuxptp
+sudo pacman -S python-pyqt6 linuxptp
 ```
 
 *Fedora:*
 ```bash
-sudo dnf install python3-qt6 pipewire linuxptp
+sudo dnf install python3-qt6 linuxptp
 ```
+
+> **PipeWire:** Required – already installed on most systems.
+> If missing, install via your package manager (`pipewire` package)
+> or compile from [source](https://pipewire.org) for the latest version
+> (recommended for AES67).
 
 **4. Run (requires root)**
 ```bash
