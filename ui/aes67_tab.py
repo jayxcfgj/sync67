@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QPushButton, QTextEdit, QGroupBox)
+                               QPushButton, QTextEdit, QGroupBox, QCheckBox)
 from PyQt6.QtCore import QProcess, QProcessEnvironment
 from PyQt6.QtGui import QFont
 import os
@@ -98,7 +98,12 @@ class AES67Tab(QWidget):
                 border: 1px solid #333333;
             }
         """)
-        layout.addWidget(QLabel("AES67 Output:"))
+        output_header = QHBoxLayout()
+        output_header.addWidget(QLabel("AES67 Output:"))
+        output_header.addStretch()
+        self.verbose_cb = QCheckBox("Verbose output (-v)")
+        output_header.addWidget(self.verbose_cb)
+        layout.addLayout(output_header)
         layout.addWidget(self.terminal_output)
 
         self.setLayout(layout)
@@ -160,10 +165,14 @@ class AES67Tab(QWidget):
             self.process.readyReadStandardError.connect(self.handle_stderr)
             self.process.finished.connect(self.process_finished)
 
-            self.process.start("pipewire-aes67", ["-c", use_config, "-v"])
+            args = ["-c", use_config]
+            if self.verbose_cb.isChecked():
+                args.append("-v")
+            self.process.start("pipewire-aes67", args)
             self.is_running = True
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
+            self.verbose_cb.setEnabled(False)
 
         except Exception as e:
             self.terminal_output.append(f"Error: {str(e)}")
@@ -181,6 +190,7 @@ class AES67Tab(QWidget):
             self.process = None
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
+            self.verbose_cb.setEnabled(True)
             self.terminal_output.append("pipewire-aes67 stopped.")
 
     def open_config(self):
@@ -251,4 +261,5 @@ class AES67Tab(QWidget):
         self.process = None
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.verbose_cb.setEnabled(True)
         self.terminal_output.append(f"pipewire-aes67 exited with code {exit_code}")
