@@ -187,7 +187,10 @@ class PTPTab(QWidget):
             if multicast_on:
                 commands.append(f"sudo ip link set {iface} multicast on")
 
-            self.run_commands(commands, iface)
+            if commands:
+                self.run_commands(commands, iface)
+            else:
+                self._start_ptp4l(iface)
 
         except Exception as e:
             self.terminal_output.append(f"Error: {str(e)}")
@@ -259,16 +262,19 @@ class PTPTab(QWidget):
         if self.command_queue:
             self.run_next_command()
         else:
-            ptp_cmd = f"sudo ptp4l -i {self.iface} -m -l 6 -H"
-            self.terminal_output.append(f"Running: {ptp_cmd}")
-            self.ptp_process = QProcess()
-            self.ptp_process.readyReadStandardOutput.connect(self.handle_stdout)
-            self.ptp_process.readyReadStandardError.connect(self.handle_stderr)
-            self.ptp_process.finished.connect(self.ptp_process_finished)
-            self.is_ptp_running = True
-            self.start_btn.setEnabled(False)
-            self.stop_btn.setEnabled(True)
-            self.ptp_process.start("bash", ["-c", ptp_cmd])
+            self._start_ptp4l(self.iface)
+
+    def _start_ptp4l(self, iface):
+        ptp_cmd = f"sudo ptp4l -f /etc/linuxptp/ptp4l.conf -i {iface} -m -l 6 -H"
+        self.terminal_output.append(f"Running: {ptp_cmd}")
+        self.ptp_process = QProcess()
+        self.ptp_process.readyReadStandardOutput.connect(self.handle_stdout)
+        self.ptp_process.readyReadStandardError.connect(self.handle_stderr)
+        self.ptp_process.finished.connect(self.ptp_process_finished)
+        self.is_ptp_running = True
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.ptp_process.start("bash", ["-c", ptp_cmd])
 
     def ptp_process_finished(self, exit_code, exit_status):
         self.is_ptp_running = False
