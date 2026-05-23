@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QRegularExpression
 from PyQt6.QtGui import QPalette, QColor, QRegularExpressionValidator, QFont
 
-from core.ptp4l_config import PTP4LConfig, format_value
+from core.ptp4l_config import PTP4LConfig, format_value, _KV_RE
 from core.ptp4l_config_meta import (
     CONFIG_PARAMS, PARAM_MAP, SECTION_ORDER, get_params_for_section
 )
@@ -317,20 +317,35 @@ class PTP4LConfigDialog(QDialog):
             label = QLabel("All binary parameters are already covered in the existing tabs.")
             label.setStyleSheet("color: gray; padding: 20px;")
             layout.addWidget(label)
+            self._other_text = None
         else:
             label = QLabel(
                 f"These {len(unknown)} parameter(s) are known to ptp4l "
-                "but not yet in our editor:"
+                "but not yet in our editor.\n"
+                "Edit them as key<tab>value pairs (one per line):"
             )
             label.setWordWrap(True)
             layout.addWidget(label)
 
-            text = QTextEdit()
-            text.setReadOnly(True)
-            text.setPlainText('\n'.join(unknown))
-            text.setFont(QFont("Courier New", 10))
-            text.setMaximumHeight(300)
-            layout.addWidget(text)
+            self._other_text = QTextEdit()
+            self._other_text.setFont(QFont("Courier New", 10))
+            self._other_text.setMaximumHeight(300)
+            self._other_text.setStyleSheet(
+                "QTextEdit { background-color: #1e1e1e; color: #e0e0e0; "
+                "border: 1px solid #555; }"
+            )
+
+            # Pre-populate with any values already in the config
+            lines = []
+            for key in unknown:
+                val = self.config.get(key)
+                if val is not None:
+                    lines.append(f"{key}\t{format_value(val)}")
+            if not lines:
+                lines = unknown
+            self._other_text.setPlainText('\n'.join(lines))
+
+            layout.addWidget(self._other_text)
 
         self.tabs.addTab(content, "🔮 Other")
 
@@ -350,6 +365,15 @@ class PTP4LConfigDialog(QDialog):
                     if (self.config._supported is not None
                             and pdef.key not in self.config._supported):
                         skipped.append(pdef.key)
+
+            # Parse Other tab params
+            if self._other_text is not None:
+                for line in self._other_text.toPlainText().split('\n'):
+                    line = line.strip()
+                    m = _KV_RE.match(line)
+                    if m:
+                        key, val = m.group(1), m.group(2).strip()
+                        self.config.set(key, val)
 
             self.config.save()
 
