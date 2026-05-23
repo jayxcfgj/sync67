@@ -8,10 +8,10 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
     QCheckBox, QComboBox, QPushButton,
-    QFormLayout, QWidget, QScrollArea, QMessageBox
+    QFormLayout, QWidget, QScrollArea, QMessageBox, QTextEdit
 )
 from PyQt6.QtCore import Qt, QRegularExpression
-from PyQt6.QtGui import QPalette, QColor, QRegularExpressionValidator
+from PyQt6.QtGui import QPalette, QColor, QRegularExpressionValidator, QFont
 
 from core.ptp4l_config import PTP4LConfig, format_value
 from core.ptp4l_config_meta import (
@@ -244,6 +244,7 @@ class PTP4LConfigDialog(QDialog):
 
         for section in SECTION_ORDER:
             self._create_tab(section, tab_names.get(section, section))
+        self._create_other_tab()
 
         self._has_changes = False  # initial loading should not mark as changed
 
@@ -288,13 +289,54 @@ class PTP4LConfigDialog(QDialog):
             val = self.config.get(pdef.key)
             container, pw = create_widget(pdef, val, on_change=self._mark_changes)
             self.widgets[pdef.key] = pw
+
+            supported = self.config._supported is None or pdef.key in self.config._supported
+            if not supported:
+                container.setEnabled(False)
+                container.setToolTip(
+                    "Not supported by the installed ptp4l version.\n"
+                    "This parameter will be skipped when saving."
+                )
+
             form.addRow(container)
 
         scroll.setWidget(content)
         self.tabs.addTab(scroll, tab_label)
 
+    def _create_other_tab(self):
+        meta_keys = {p.key for p in CONFIG_PARAMS}
+        if self.config._supported is None:
+            unknown = []
+        else:
+            unknown = sorted(self.config._supported - meta_keys)
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
+
+        if not unknown:
+            label = QLabel("All binary parameters are already covered in the existing tabs.")
+            label.setStyleSheet("color: gray; padding: 20px;")
+            layout.addWidget(label)
+        else:
+            label = QLabel(
+                f"These {len(unknown)} parameter(s) are known to ptp4l "
+                "but not yet in our editor:"
+            )
+            label.setWordWrap(True)
+            layout.addWidget(label)
+
+            text = QTextEdit()
+            text.setReadOnly(True)
+            text.setPlainText('\n'.join(unknown))
+            text.setFont(QFont("Courier New", 10))
+            text.setMaximumHeight(300)
+            layout.addWidget(text)
+
+        self.tabs.addTab(content, "🔮 Other")
+
     def _on_apply(self):
         try:
+            skipped = []
             for key, pw in self.widgets.items():
                 pdef = pw.defn
                 try:
@@ -304,10 +346,19 @@ class PTP4LConfigDialog(QDialog):
                 # Handle SlaveOnly/MasterOnly as bool-int
                 if isinstance(value, bool):
                     value = 1 if value else 0
-                self.config.set(pdef.key, value)
+                if not self.config.set(pdef.key, value):
+                    if (self.config._supported is not None
+                            and pdef.key not in self.config._supported):
+                        skipped.append(pdef.key)
 
             self.config.save()
-            QMessageBox.information(self, 'Success', 'Config saved.')
+
+            msg = 'Config saved.'
+            if skipped:
+                msg += (f'\n\n{len(skipped)} parameter(s) were skipped '
+                        '(not supported by your ptp4l version):\n'
+                        + ', '.join(skipped))
+            QMessageBox.information(self, 'Success', msg)
             self._has_changes = False
             self.accept()
 
