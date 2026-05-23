@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QComboBox, QPushButton, QTextEdit, QGroupBox,
-                               QFormLayout)
+                               QFormLayout, QScrollArea)
 from PyQt6.QtCore import Qt, QProcess, QSettings
 from PyQt6.QtGui import QFont
 import subprocess
@@ -19,7 +19,11 @@ class PTPTab(QWidget):
         self._ptp_offset = None
 
     def init_ui(self):
-        layout = QVBoxLayout()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         interface_group = QGroupBox("Network Interface")
         interface_layout = QFormLayout()
@@ -108,7 +112,10 @@ class PTPTab(QWidget):
         layout.addWidget(QLabel("PTP Output:"))
         layout.addWidget(self.terminal_output)
 
-        self.setLayout(layout)
+        scroll.setWidget(content)
+        main = QVBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.addWidget(scroll)
 
         self.process = QProcess()
         self.process.readyReadStandardOutput.connect(self.handle_stdout)

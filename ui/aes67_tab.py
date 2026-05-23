@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QPushButton, QTextEdit, QGroupBox, QCheckBox)
+                               QPushButton, QTextEdit, QGroupBox, QCheckBox,
+                               QScrollArea)
 from PyQt6.QtCore import QProcess, QProcessEnvironment
 from PyQt6.QtGui import QFont
 import os
@@ -30,7 +31,11 @@ class AES67Tab(QWidget):
             self.config = None
 
     def init_ui(self):
-        layout = QVBoxLayout()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         button_layout = QHBoxLayout()
         self.start_btn = QPushButton("Start pipewire-aes67")
@@ -106,7 +111,10 @@ class AES67Tab(QWidget):
         layout.addLayout(output_header)
         layout.addWidget(self.terminal_output)
 
-        self.setLayout(layout)
+        scroll.setWidget(content)
+        main = QVBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.addWidget(scroll)
 
     def start_aes67(self):
         try:

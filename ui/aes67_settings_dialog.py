@@ -353,6 +353,7 @@ class RtpSinkTabWidget(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
+        content.setMinimumSize(0, 0)
         form = QFormLayout(content)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -394,8 +395,9 @@ class AES67SettingsDialog(QDialog):
         self._has_changes = False
 
         self.setWindowTitle('AES67 Config Editor')
-        self.setMinimumSize(650, 550)
+        self.setMinimumSize(400, 250)
         self.resize(700, 600)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
         self._init_ui()
 
     def _apply_dark_theme(self):
@@ -535,6 +537,7 @@ class AES67SettingsDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
+        content.setMinimumSize(0, 0)
         form = QFormLayout(content)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -568,6 +571,7 @@ class AES67SettingsDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
+        content.setMinimumSize(0, 0)
         form = QFormLayout(content)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -619,6 +623,7 @@ class AES67SettingsDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
+        content.setMinimumSize(0, 0)
         layout = QVBoxLayout(content)
 
         # Advanced parameter widgets

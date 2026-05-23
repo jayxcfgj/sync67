@@ -206,8 +206,9 @@ class PTP4LConfigDialog(QDialog):
         self.widgets = {}
         self._has_changes = False
         self.setWindowTitle('PTP4L Config Editor')
-        self.setMinimumSize(650, 550)
+        self.setMinimumSize(480, 300)
         self.resize(700, 600)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
         self._apply_dark_theme()
         self._init_ui()
 
@@ -281,6 +282,7 @@ class PTP4LConfigDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
+        content.setMinimumSize(0, 0)
         form = QFormLayout(content)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -311,6 +313,7 @@ class PTP4LConfigDialog(QDialog):
             unknown = sorted(self.config._supported - meta_keys)
 
         content = QWidget()
+        content.setMinimumSize(0, 0)
         layout = QVBoxLayout(content)
 
         if not unknown:

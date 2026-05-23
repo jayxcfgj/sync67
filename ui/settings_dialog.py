@@ -1,19 +1,29 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QCheckBox, QPushButton, QGroupBox, QFormLayout)
+                               QCheckBox, QPushButton, QGroupBox, QFormLayout,
+                               QScrollArea, QWidget)
 from PyQt6.QtCore import Qt, QSettings
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PTP Interface Settings")
-        self.setGeometry(200, 200, 400, 300)
+        self.setWindowTitle("PTP Start Options")
+        self.setMinimumSize(300, 200)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
         self.init_ui()
         self.load_settings()
         
     def init_ui(self):
         layout = QVBoxLayout()
         
-        # Settings group
+        # Scroll area for settings content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        
+        content = QWidget()
+        content.setMinimumSize(0, 0)
+        content_layout = QVBoxLayout(content)
+        
         settings_group = QGroupBox("Interface Optimization Settings")
         settings_layout = QFormLayout()
         
@@ -40,7 +50,11 @@ class SettingsDialog(QDialog):
         settings_layout.addRow(self.multicast_check)
         
         settings_group.setLayout(settings_layout)
-        layout.addWidget(settings_group)
+        content_layout.addWidget(settings_group)
+        content_layout.addStretch()
+        
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
         
         # Buttons
         button_layout = QHBoxLayout()

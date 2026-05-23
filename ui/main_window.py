@@ -11,6 +11,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("sync67")
         self.setGeometry(200, 200, 900, 700)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
 
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)

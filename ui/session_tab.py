@@ -7,7 +7,7 @@ import sys
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QGridLayout, QProgressBar
+    QGroupBox, QGridLayout, QProgressBar, QScrollArea
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor
@@ -27,7 +27,11 @@ class SessionTab(QWidget):
         self._timer.start(2000)
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         # ── Quick-Start ──
         qs_group = QGroupBox('Quick-Start')
@@ -215,6 +219,11 @@ class SessionTab(QWidget):
         layout.addWidget(rt_group)
 
         layout.addStretch()
+
+        scroll.setWidget(content)
+        main = QVBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.addWidget(scroll)
 
     # ─── Session Start / Stop ─────────────────────────────
 

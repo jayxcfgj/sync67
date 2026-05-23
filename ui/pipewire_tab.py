@@ -7,7 +7,7 @@ import subprocess
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QPushButton, QGroupBox, QGridLayout, QProgressBar,
-    QTableWidget, QTableWidgetItem
+    QTableWidget, QTableWidgetItem, QScrollArea
 )
 from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QFont, QColor, QBrush
@@ -55,7 +55,11 @@ class PipeWireTab(QWidget):
     # ─── UI ───────────────────────────────────────────────────
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         # ── Sample Rate ──
         rg = QGroupBox('Sample Rate')
@@ -172,6 +176,11 @@ class PipeWireTab(QWidget):
                     self.table.setColumnWidth(i, w)
         self.table.horizontalHeader().sectionResized.connect(self._save_column_widths)
         layout.addWidget(tg)
+
+        scroll.setWidget(content)
+        main = QVBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.addWidget(scroll)
 
     def _save_column_widths(self):
         settings = QSettings("sync67", "pipewire_tab")
