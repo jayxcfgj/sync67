@@ -247,6 +247,9 @@ class PTP4LConfig:
         val = val.strip()
         if val.startswith('0x'):
             return val
+        # Preserve leading zero (e.g. octal file modes like 0660)
+        if val.startswith('0') and len(val) > 1 and val[1:].isdigit():
+            return val
         if val in ('0', '1'):
             return int(val)
         try:

@@ -293,10 +293,10 @@ class PTP4LConfigDialog(QDialog):
             supported = self.config._supported is None or pdef.key in self.config._supported
             if not supported:
                 container.setEnabled(False)
-                container.setToolTip(
-                    "Not supported by the installed ptp4l version.\n"
-                    "This parameter will be skipped when saving."
-                )
+                label = container.layout().itemAt(0).widget()
+                if isinstance(label, QLabel):
+                    label.setText(f"{pdef.label} (unsupported)")
+                    label.setStyleSheet("color: #ff6b6b;")
 
             form.addRow(container)
 
