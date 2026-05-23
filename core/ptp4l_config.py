@@ -64,20 +64,26 @@ class PTP4LConfig:
         return self._data.get(key)
 
     def set(self, key, value):
-        if key not in self._line_map:
-            return False
-        old = self._data.get(key)
-        if old == value:
-            return False
-        self._data[key] = value
+        if key in self._line_map:
+            old = self._data.get(key)
+            if old == value:
+                return False
+            self._data[key] = value
 
-        # Update raw line
-        idx = self._line_map[key]
-        old_line = self._lines[idx]
-        m = _KV_RE.match(old_line) or _COMMENTED_KV_RE.match(old_line)
-        if m:
-            indent = old_line[:m.start(1)]
-            self._lines[idx] = f"{indent}{key}\t{value}"
+            # Update raw line
+            idx = self._line_map[key]
+            old_line = self._lines[idx]
+            m = _KV_RE.match(old_line) or _COMMENTED_KV_RE.match(old_line)
+            if m:
+                indent = old_line[:m.start(1)]
+                self._lines[idx] = f"{indent}{key}\t{value}"
+            self._modified = True
+            return True
+
+        # Key not in file – append new line at end
+        self._data[key] = value
+        self._lines.append(f"{key}\t{value}")
+        self._line_map[key] = len(self._lines) - 1
         self._modified = True
         return True
 
