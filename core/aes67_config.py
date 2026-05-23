@@ -36,7 +36,13 @@ _BLOCK_START_RE = re.compile(
 
 
 def parse_value(val_str):
-    val_str = val_str.strip().rstrip(',')
+    val_str = val_str.strip()
+    if not val_str.startswith('"'):
+        if '#' in val_str:
+            val_str = val_str.split('#')[0].strip()
+        if ';' in val_str:
+            val_str = val_str.split(';')[0].strip()
+    val_str = val_str.rstrip(',')
     if not val_str:
         return ''
     if val_str == 'true':

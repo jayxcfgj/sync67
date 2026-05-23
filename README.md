@@ -23,11 +23,15 @@ A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio
   - Quick tab with 10 essential parameters
   - Format-preserving parser, Reset Config button
   - Deviation highlighting, tooltips, dark theme
+  - **Auto-detection** of supported parameters via `strings /usr/sbin/ptp4l`
+    → unsupported parameters greyed out with `(unsupported)` label
+  - `🔮 Other` tab for unknown binary parameters
 
 ### AES67 Tab
 ![AES67 Tab + Config Editor](assets/aes67-tab+config-editor.png)
 
 - pipewire-aes67 start/stop with live terminal output
+  - Optional verbose mode (`-v` flag toggle)
 - Open config file in external editor
 - **AES67 Config Editor**: full GUI editor for `pipewire-aes67.conf`
   - 40 parameters across 4 tabs (PTP Clock, RTP SAP Input, RTP Sink Output, Expert)
