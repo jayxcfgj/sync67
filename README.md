@@ -39,6 +39,7 @@ A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio
   - RTP Sink multi-instance support (add/remove)
   - System Clock checkbox (bypasses PHC timestamp-0 issue when running as root)
   - Deviation highlighting when value differs from default
+  - **Inline comment handling**: `#` and `;` comments in SPA config values are properly stripped
   - stream.rules raw editor in Expert tab
   - Dark theme
 

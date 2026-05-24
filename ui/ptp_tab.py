@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QFormLayout, QScrollArea)
 from PyQt6.QtCore import Qt, QProcess, QSettings
 from PyQt6.QtGui import QFont
+import os
 import subprocess
 import re
 import shutil
@@ -153,6 +154,20 @@ class PTPTab(QWidget):
         dialog = SettingsDialog(self)
         dialog.exec()
 
+    def _ensure_uds_dir(self):
+        try:
+            from core.ptp4l_config import PTP4LConfig
+            cfg = PTP4LConfig()
+            cfg.load("/etc/linuxptp/ptp4l.conf")
+            for key in ("uds_address", "uds_ro_address"):
+                val = cfg.get(key)
+                if val:
+                    parent = os.path.dirname(str(val))
+                    if parent:
+                        os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+
     def start_ptp(self):
         try:
             iface = self.interface_combo.currentText()
@@ -171,6 +186,8 @@ class PTPTab(QWidget):
                 self.terminal_output.append("No cached sudo credentials.")
                 self.terminal_output.append("Run 'sudo -v' in a terminal first, then click START PTP again.")
                 return
+
+            self._ensure_uds_dir()
 
             settings = QSettings("sync67", "ptp_settings")
             gro_off = settings.value("gro_off", True, type=bool)
