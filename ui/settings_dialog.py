@@ -28,43 +28,44 @@ class SettingsDialog(QDialog):
         settings_layout = QFormLayout()
         
         self.gro_check = QCheckBox("Disable Generic Receive Offset (gro off)")
-        self.gro_check.setToolTip("Prevents the NIC from coalescing received packets. "
+        self.gro_check.setToolTip("Prevents the NIC from coalescing received packets.\n"
             "Reduces latency and is recommended for PTP timestamp accuracy.")
         self.gso_check = QCheckBox("Disable Generic Segmentation Offset (gso off)")
-        self.gso_check.setToolTip("Prevents the NIC from segmenting large packets in hardware. "
+        self.gso_check.setToolTip("Prevents the NIC from segmenting large packets.\n"
             "Avoids PTP frames being delayed behind segmented bulk traffic.")
         self.tso_check = QCheckBox("Disable TCP Segmentation Offload (tso off)")
-        self.tso_check.setToolTip("Prevents the NIC from offloading TCP segmentation. "
-            "Same rationale as GSO – ensures PTP frames are not queued behind large segments.")
+        self.tso_check.setToolTip("Prevents the NIC from offloading TCP segmentation.\n"
+            "Same rationale as GSO – keeps PTP frames from being queued.")
         self.sg_check = QCheckBox("Disable Scatter-Gather (sg off)")
-        self.sg_check.setToolTip("Disables scatter-gather DMA. "
-            "Required on some Intel i210/i211 NICs where SG interferes with PTP TX timestamp delivery. "
-            "May increase CPU load slightly.")
+        self.sg_check.setToolTip("Disables scatter-gather DMA.\n"
+            "Required on Intel i210/i211 NICs where SG interferes\n"
+            "with PTP TX timestamp delivery.")
         self.rx_usecs_check = QCheckBox("Set rx-usecs to 0 (no interrupt coalescing)")
-        self.rx_usecs_check.setToolTip("Sets the NIC interrupt coalescing timer to 0. "
-            "Every received packet triggers an immediate interrupt, minimizing latency. "
-            "Recommended for PTP and real-time audio.")
+        self.rx_usecs_check.setToolTip("Sets NIC interrupt coalescing to 0.\n"
+            "Every received packet triggers an immediate interrupt,\n"
+            "minimizing latency. Recommended for PTP and audio.")
         self.multicast_check = QCheckBox("Enable Multicast (multicast on)")
-        self.multicast_check.setToolTip("Enables multicast reception on the interface. "
-            "PTP uses multicast MAC addresses (01:1B:19:00:00:00) for Sync and Announce messages. "
+        self.multicast_check.setToolTip("Enables multicast reception on the interface.\n"
+            "PTP uses multicast MAC addresses for Sync and Announce.\n"
             "Must be enabled for PTP to work.")
         self.phc_reset_check = QCheckBox("Reset PHC clock to system time (phc_ctl set)")
-        self.phc_reset_check.setToolTip("Resets the PTP Hardware Clock (PHC) to the current system time. "
-            "Many NICs (especially USB adapters) start their PHC at epoch 0 after boot, "
-            "causing a multi-year offset that PTP cannot correct. "
+        self.phc_reset_check.setToolTip("Resets the PTP Hardware Clock to system time.\n"
+            "Many NICs (especially USB adapters) start PHC at epoch 0\n"
+            "after boot, causing a multi-year PTP offset.\n"
             "Safe to always enable.")
         self.mcast_event_check = QCheckBox("Join PTP event multicast (01:1B:19:00:00:00)")
-        self.mcast_event_check.setToolTip("Explicitly joins the PTP event multicast group. "
-            "Some USB NIC drivers (e.g., ASIX AX88xxx) do not automatically join PTP multicast groups. "
-            "Harmless on NICs that handle this correctly.")
+        self.mcast_event_check.setToolTip("Joins the PTP event multicast group.\n"
+            "Some USB NIC drivers (ASIX AX88xxx) do not auto-join\n"
+            "PTP multicast groups. Harmless on other NICs.")
         self.mcast_pdelay_check = QCheckBox("Join PTP peer delay multicast (01:80:C2:00:00:0E)")
-        self.mcast_pdelay_check.setToolTip("Explicitly joins the PTP peer delay multicast group. "
-            "Required for peer delay measurement on some USB NICs. Same rationale as the event multicast.")
+        self.mcast_pdelay_check.setToolTip("Joins the PTP peer delay multicast group.\n"
+            "Required for peer delay measurement on some USB NICs.\n"
+            "Same rationale as event multicast.")
         self.wol_check = QCheckBox("Disable Wake-on-LAN (wol d)")
-        self.wol_check.setToolTip("Disables Wake-on-LAN. "
-            "On Intel i210/i211 NICs, WoL shares PHY resources with PTP TX timestamping. "
-            "When WoL is enabled, TX timestamps may not reach the application, "
-            "causing 'master sync timeout' or 'delay timeout'.")
+        self.wol_check.setToolTip("Disables Wake-on-LAN.\n"
+            "On Intel i210/i211 NICs, WoL shares PHY resources with\n"
+            "PTP TX timestamping. With WoL on, timestamps may not\n"
+            "reach the app, causing 'master sync timeout'.")
 
         # Set all to checked by default
         self.gro_check.setChecked(True)
