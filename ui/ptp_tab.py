@@ -196,8 +196,16 @@ class PTPTab(QWidget):
             sg_off = settings.value("sg_off", True, type=bool)
             rx_usecs_0 = settings.value("rx_usecs_0", True, type=bool)
             multicast_on = settings.value("multicast_on", True, type=bool)
+            phc_reset = settings.value("phc_reset", True, type=bool)
+            mcast_event = settings.value("mcast_event", True, type=bool)
+            mcast_pdelay = settings.value("mcast_pdelay", True, type=bool)
+            wol_d = settings.value("wol_d", True, type=bool)
 
             commands = []
+            if phc_reset:
+                commands.append("sudo phc_ctl /dev/ptp0 set")
+            if wol_d:
+                commands.append(f"sudo ethtool -s {iface} wol d")
             if gro_off:
                 commands.append(f"sudo ethtool -K {iface} gro off")
             if gso_off:
@@ -208,6 +216,10 @@ class PTPTab(QWidget):
                 commands.append(f"sudo ethtool -K {iface} sg off")
             if rx_usecs_0:
                 commands.append(f"sudo ethtool -C {iface} rx-usecs 0")
+            if mcast_event:
+                commands.append(f"sudo ip maddr add 01:1B:19:00:00:00 dev {iface}")
+            if mcast_pdelay:
+                commands.append(f"sudo ip maddr add 01:80:C2:00:00:0E dev {iface}")
             if multicast_on:
                 commands.append(f"sudo ip link set {iface} multicast on")
 
