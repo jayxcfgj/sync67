@@ -18,6 +18,7 @@ class PTPTab(QWidget):
         self.ptp_process = None
         self.is_ptp_running = False
         self._ptp_offset = None
+        self._ptp_state = ""
 
     def init_ui(self):
         scroll = QScrollArea()
@@ -85,6 +86,10 @@ class PTPTab(QWidget):
         self.status_light.setFixedSize(24, 24)
         self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
         button_layout.addWidget(self.status_light)
+        self.state_label = QLabel("")
+        self.state_label.setStyleSheet("color: #cccccc; font-size: 12px; padding-left: 4px;")
+        self.state_label.setMinimumWidth(100)
+        button_layout.addWidget(self.state_label)
 
         button_layout.addStretch()
         layout.addLayout(button_layout)
@@ -263,12 +268,12 @@ class PTPTab(QWidget):
         self.parse_ptp_output(stderr)
 
     def parse_ptp_output(self, text):
-        patterns = [
+        offset_patterns = [
             r'rms\s+(-?\d+)',
             r'offset\s+(-?\d+)'
         ]
         value = None
-        for pattern in patterns:
+        for pattern in offset_patterns:
             match = re.search(pattern, text)
             if match:
                 try:
@@ -279,20 +284,57 @@ class PTPTab(QWidget):
                     pass
         if value is not None:
             self._ptp_offset = value
-            self.update_status_light(value)
 
-    def update_status_light(self, value):
-        if value <= 200:
-            color = "green"
-            status = "very good"
-        elif value <= 1000:
-            color = "yellow"
-            status = "okay"
+        state_patterns = [
+            (r'to MASTER on ', "MASTER"),
+            (r'to SLAVE on ', "SLAVE"),
+            (r'to UNCALIBRATED on ', "UNCALIBRATED"),
+            (r'to FAULTY on ', "FAULTY"),
+            (r'to LISTENING on ', "LISTENING"),
+        ]
+        for pat, state in state_patterns:
+            if re.search(pat, text):
+                self._ptp_state = state
+                break
+
+        self.update_status_light(value)
+
+    def update_status_light(self, value=None):
+        if self._ptp_state == "MASTER":
+            color = "#2196F3"
+            tip = "Grand Master – no PTP peer detected"
+            label_text = "Grand Master"
+        elif self._ptp_state == "FAULTY":
+            color = "#ff0000"
+            tip = "FAULTY – link or PTP error"
+            label_text = "FAULTY"
+        elif self._ptp_state == "LISTENING":
+            color = "gray"
+            tip = "Listening for PTP messages..."
+            label_text = "Listening..."
+        elif self._ptp_state == "UNCALIBRATED":
+            color = "orange"
+            tip = "Uncalibrated – acquiring sync"
+            label_text = "Uncalibrated..."
+        elif value is not None and self._ptp_state == "SLAVE":
+            label_text = f"Slave ({value}ns)"
+            if value <= 200:
+                color = "green"
+                tip = f"Sync: {value}ns (very good)"
+            elif value <= 1000:
+                color = "yellow"
+                tip = f"Sync: {value}ns (okay)"
+            else:
+                color = "red"
+                tip = f"Sync: {value}ns (problematic)"
         else:
-            color = "red"
-            status = "problematic"
+            color = "gray"
+            tip = "Sync Status: waiting"
+            label_text = ""
+
         self.status_light.setStyleSheet(f"background-color: {color}; border-radius: 12px;")
-        self.status_light.setToolTip(f"Sync value: {value} ({status})")
+        self.status_light.setToolTip(tip)
+        self.state_label.setText(label_text)
 
     def process_finished(self, exit_code, exit_status):
         if self.command_queue:
@@ -312,13 +354,19 @@ class PTPTab(QWidget):
         self.stop_btn.setEnabled(True)
         self.ptp_process.start("bash", ["-c", ptp_cmd])
 
+    def _reset_status(self):
+        self._ptp_state = ""
+        self._ptp_offset = None
+        self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
+        self.status_light.setToolTip("Sync Status: stopped")
+        self.state_label.setText("")
+
     def ptp_process_finished(self, exit_code, exit_status):
         self.is_ptp_running = False
         self.ptp_process = None
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
-        self.status_light.setToolTip("Sync Status: stopped")
+        self._reset_status()
         if exit_code == 0:
             self.terminal_output.append("PTP process completed successfully.")
         else:
@@ -336,8 +384,7 @@ class PTPTab(QWidget):
             self.ptp_process = None
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
-            self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
-            self.status_light.setToolTip("Sync Status: stopped")
+            self._reset_status()
             self.terminal_output.append("PTP stopped.")
 
     def open_ptp4l_config(self):
