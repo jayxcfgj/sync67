@@ -18,6 +18,10 @@ A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio
 - ptp4l start/stop with live terminal output
 - Sync status indicator (traffic light: green ≤200ns, yellow ≤1000ns, red)
 - ethtool/ip link optimization settings (gro, gso, tso, sg, rx-usecs, multicast)
+  - **PHC reset** (`phc_ctl set`) – fixes PTP sync after boot on USB adapters and some NICs
+  - **PTP multicast join** (`ip maddr add`) – required by ASIX USB NICs to receive PTP frames
+  - **Wake-on-LAN disable** (`wol d`) – prevents Intel i210/i211 from blocking TX timestamps
+  - All options have tooltips explaining what they do and when to use them
 - **PTP4L Config Editor**: full GUI editor for `/etc/linuxptp/ptp4l.conf`
   - 119 parameters across 7 tabs (Quick, Default, Port, Runtime, Servo, Transport, Interface)
   - Quick tab with 10 essential parameters
