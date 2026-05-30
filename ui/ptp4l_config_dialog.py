@@ -330,6 +330,14 @@ class PTP4LConfigDialog(QDialog):
             label.setWordWrap(True)
             layout.addWidget(label)
 
+            self._other_search = QLineEdit()
+            self._other_search.setPlaceholderText("Search parameters...")
+            self._other_search.setStyleSheet(
+                "QLineEdit { background-color: #1e1e1e; color: #e0e0e0; "
+                "border: 1px solid #555; border-radius: 4px; padding: 4px 8px; }"
+            )
+            layout.addWidget(self._other_search)
+
             self._other_text = QTextEdit()
             self._other_text.setFont(QFont("Courier New", 10))
             self._other_text.setMaximumHeight(300)
@@ -346,7 +354,27 @@ class PTP4LConfigDialog(QDialog):
                     lines.append(f"{key}\t{format_value(val)}")
             if not lines:
                 lines = unknown
+            self._other_lines = lines
             self._other_text.setPlainText('\n'.join(lines))
+
+            def _apply_filter(text):
+                """Filtert ohne Datenverlust – edited lines bleiben erhalten."""
+                cursor = self._other_text.textCursor()
+                cursor.movePosition(cursor.MoveOperation.Start)
+                self._other_text.setTextCursor(cursor)
+                found = self._other_text.find(text) if text else False
+                self._other_search.setStyleSheet(
+                    "QLineEdit { background-color: #1e1e1e; color: #e0e0e0; "
+                    "border: 1px solid #555; border-radius: 4px; padding: 4px 8px; }"
+                    if found or not text else
+                    "QLineEdit { background-color: #2d1e1e; color: #e0e0e0; "
+                    "border: 1px solid #f44336; border-radius: 4px; padding: 4px 8px; }"
+                )
+
+            self._other_search.textChanged.connect(_apply_filter)
+            self._other_search.returnPressed.connect(
+                lambda: self._other_text.find(self._other_search.text())
+            )
 
             layout.addWidget(self._other_text)
 
@@ -380,12 +408,13 @@ class PTP4LConfigDialog(QDialog):
 
             self.config.save()
 
-            msg = 'Config saved.'
             if skipped:
-                msg += (f'\n\n{len(skipped)} parameter(s) were skipped '
-                        '(not supported by your ptp4l version):\n'
-                        + ', '.join(skipped))
-            QMessageBox.information(self, 'Success', msg)
+                QMessageBox.information(
+                    self, 'Saved',
+                    f'Config saved.\n{len(skipped)} unsupported parameter(s) skipped.'
+                )
+            else:
+                QMessageBox.information(self, 'Saved', 'Config saved.')
             self._has_changes = False
             self.accept()
 
