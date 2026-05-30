@@ -126,6 +126,7 @@ class AES67Tab(QWidget):
         # DSP Load
         dsp_group = QGroupBox("DSP Load")
         dsp_group.setObjectName("AES67Dsp")
+        dsp_group.setMaximumHeight(58)
         dsp_group.setStyleSheet("""
             QGroupBox#AES67Dsp { font-size: 11px; padding: 2px 4px; border: 1px solid #555; border-radius: 4px; margin-top: 12px; }
             QGroupBox#AES67Dsp::title { subcontrol-origin: margin; left: 6px; padding: 0 2px; }
@@ -232,7 +233,7 @@ class AES67Tab(QWidget):
         status_inner = QHBoxLayout()
         status_inner.addLayout(status_grid)
         status_inner.addStretch()
-        status_inner.addWidget(dsp_group)
+        status_inner.addWidget(dsp_group, alignment=Qt.AlignmentFlag.AlignTop)
         status_group.setLayout(status_inner)
         top_row.addWidget(status_group, stretch=1)
 
