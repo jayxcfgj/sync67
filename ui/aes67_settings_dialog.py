@@ -83,7 +83,7 @@ class ParamWidget:
 
 class StringWidget(ParamWidget):
     def get_value(self):
-        return self.widget.text()
+        return f'"{self.widget.text()}"'
 
     def set_value(self, value):
         if isinstance(value, str) and value.startswith('"'):
@@ -163,11 +163,14 @@ class PortWidget(ParamWidget):
 class MultilineWidget(ParamWidget):
     def get_value(self):
         text = self.widget.toPlainText().strip()
+        if not text:
+            return []
         if text.startswith('[') and text.endswith(']'):
-            inner = text[1:-1]
-            items = [item.strip().strip('"') for item in inner.split(',') if item.strip()]
-            return '[' + ', '.join(f'"{item}"' if ' ' in item else item for item in items) + ']'
-        return text
+            text = text[1:-1].strip()
+        if not text:
+            return []
+        items = [item.strip().strip('"') for item in text.split(',') if item.strip()]
+        return [f'"{item}"' for item in items]
 
     def set_value(self, value):
         if isinstance(value, list):
@@ -207,6 +210,12 @@ def create_widget(param_def, current_value):
             default_text = 'Default: checked' if str(default_val) in ('1', 'true', 'True') else 'Default: unchecked'
     elif param_def.type == 'interface':
         default_text = 'Default: select same as in PTP tab'
+    elif param_def.type == 'multiline':
+        d = str(param_def.default) if param_def.default is not None else ''
+        if d.startswith('[') and d.endswith(']'):
+            d = d[1:-1]
+        d = d.strip('"')
+        default_text = f'Default: {d}' if d else ''
     else:
         default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
     default_label = QLabel(default_text)
@@ -315,7 +324,12 @@ def create_widget(param_def, current_value):
         except Exception:
             return
         default = param_def.default
-        is_dev = str(current) != str(default)
+        if param_def.type == 'multiline' and isinstance(current, list):
+            current_str = ', '.join(v.strip('"') for v in current)
+            default_str = default.strip('"').strip('[').strip(']') if isinstance(default, str) else str(default)
+            is_dev = current_str != default_str
+        else:
+            is_dev = str(current) != str(default)
         pw.mark_deviation(is_dev)
 
     # Connect change signal

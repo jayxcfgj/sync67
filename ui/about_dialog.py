@@ -1,25 +1,11 @@
 """About dialog for sync67."""
 
-import subprocess
-import re
-import sys
-
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPixmap
 from pathlib import Path
 
 from core.version import __version__, __app_name__, __description__, __license__, __author__
-
-
-def _get_version(cmd, flag='--version', idx=0):
-    try:
-        r = subprocess.run([cmd, flag], capture_output=True, text=True, timeout=3)
-        out = (r.stdout or r.stderr or '').strip()
-        m = re.search(r'(\d+\.\d+\.?\d*)', out)
-        return m.group(1) if m else ''
-    except Exception:
-        return ''
 
 
 class AboutDialog(QDialog):
@@ -66,26 +52,6 @@ class AboutDialog(QDialog):
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(desc)
-
-        layout.addSpacing(10)
-
-        # Versionen
-        pw_ver = _get_version('pipewire')
-        ptp_ver = _get_version('ptp4l')
-        py_ver = f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}'
-        from PyQt6.QtCore import PYQT_VERSION_STR
-
-        versions = QLabel(
-            f'<pre style="color: #aaa;">'
-            f'PipeWire  {pw_ver or "–":>8}\n'
-            f'LinuxPTP  {ptp_ver or "–":>8}\n'
-            f'Python    {py_ver:>8}\n'
-            f'PyQt6     {PYQT_VERSION_STR:>8}'
-            f'</pre>'
-        )
-        versions.setTextFormat(Qt.TextFormat.RichText)
-        versions.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(versions)
 
         layout.addSpacing(10)
 

@@ -44,6 +44,8 @@ A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio
   - System Clock checkbox (bypasses PHC timestamp-0 issue when running as root)
   - Deviation highlighting when value differs from default
   - **Inline comment handling**: `#` and `;` comments in SPA config values are properly stripped
+  - **Value quoting**: values containing `=` (e.g. `ptp=traceable`) are properly quoted
+  - **Single-line array parsing**: arrays like `node.channel-names = ["CH1", "CH2"]` are handled correctly
   - stream.rules raw editor in Expert tab
   - Dark theme
 
@@ -66,14 +68,14 @@ A Linux desktop AOIP tool for managing, monitoring and configuring **AES67 audio
 ![Session Tab](assets/session-tab.png)
 
 - **Quick-Start**: Start ptp4l + pipewire-aes67 in the correct order with one button
-  - Start sequence: ptp4l → 2s delay → pipewire-aes67
+  - Start sequence: ptp4l → polls PTP sync → pipewire-aes67 (no fixed delay)
   - Stop sequence: aes67 → ptp4l
 - **System Status**: overview of PTP, AES67, and PipeWire at a glance
-- PTP Sync traffic light + offset display
+- PTP Sync traffic light + port state (Master/Slave/Listening/FAULTY) + offset display
 - Xruns counter + DSP load bar (from PipeWire tab)
-- **Versions block**: PipeWire, LinuxPTP, Python, PyQt6 (installed/missing)
-- **Routing Tools**: buttons to launch qpwgraph, helvum, coppwr (native + Flatpak detection)
-- **About dialog**: version info, author, license, technology stack
+- **Versions block**: PipeWire, LinuxPTP, Python, PyQt6 with minimum version checks (min 1.1 / min 4.0)
+- **Routing Tools**: buttons to launch qpwgraph, helvum, coppwr (native + Flatpak with automatic stale directory cleanup)
+- **About dialog**: app info, author, license
 
 ---
 

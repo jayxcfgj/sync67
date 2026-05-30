@@ -33,6 +33,9 @@ _KV_RE = re.compile(
 _BLOCK_START_RE = re.compile(
     r'^(?P<indent>\s*)(?P<key>[\w.\-*]+)\s*=\s*(?P<brace>[\[\{])\s*$'
 )
+_INLINE_ARRAY_RE = re.compile(
+    r'^(?P<indent>\s*)(?P<key>[\w.\-*]+)\s*=\s*(?P<values>\[.+?\])\s*,?\s*$'
+)
 
 
 def parse_value(val_str):
@@ -61,6 +64,30 @@ def parse_value(val_str):
         return val_str
 
 
+def _parse_array_content(val_str):
+    """Parse ["CH1", "CH2"] into ['"CH1"', '"CH2"'] (quote-embedded items)."""
+    val_str = val_str.strip()
+    if val_str.startswith('[') and val_str.endswith(']'):
+        inner = val_str[1:-1].strip()
+        if not inner:
+            return []
+        items = []
+        current = []
+        in_quote = False
+        for ch in inner:
+            if ch == '"':
+                in_quote = not in_quote
+            if ch == ',' and not in_quote:
+                items.append(''.join(current).strip())
+                current = []
+            else:
+                current.append(ch)
+        if current:
+            items.append(''.join(current).strip())
+        return [parse_value(item) for item in items if item]
+    return parse_value(val_str)
+
+
 def format_value(value):
     if isinstance(value, bool):
         return 'true' if value else 'false'
@@ -77,7 +104,7 @@ def format_value(value):
         return 'null'
     # Quote strings that contain spaces or special characters
     val = str(value)
-    if ' ' in val or '"' in val or val.startswith('#'):
+    if ' ' in val or '"' in val or val.startswith('#') or '=' in val:
         if not val.startswith('"'):
             val = '"' + val.replace('"', '\\"') + '"'
     return val
@@ -200,6 +227,12 @@ class AES67Config:
                 indent = m.group('indent')
                 new_line = f"{indent}{leaf_key} = {format_value(value)}"
                 self._raw_lines[line_idx] = new_line
+            else:
+                m2 = _INLINE_ARRAY_RE.match(old_line)
+                if m2:
+                    indent = m2.group('indent')
+                    new_line = f"{indent}{leaf_key} = {format_value(value)}"
+                    self._raw_lines[line_idx] = new_line
         self._modified = True
         return True
 
@@ -423,6 +456,16 @@ class AES67Config:
                 i = end_idx + 1
                 continue
 
+            # Try single-line array (key = [ ... ])
+            m = _INLINE_ARRAY_RE.match(line)
+            if m:
+                k = m.group('key')
+                result[k] = _parse_array_content(m.group('values'))
+                full_path = parent_path + '.' + k if parent_path else k
+                self._line_map.append((full_path, i))
+                i += 1
+                continue
+
             # Try key = value
             m = _KV_RE.match(line)
             if m:
@@ -611,9 +654,12 @@ class AES67Config:
                 if bm and bm.group('key') == 'args':
                     in_args = True
 
-            if in_target and in_args and _KV_RE.match(line):
+            if in_target and in_args:
                 km = _KV_RE.match(line)
                 if km and km.group('key') == target:
+                    return idx
+                im = _INLINE_ARRAY_RE.match(line)
+                if im and im.group('key') == target:
                     return idx
 
             if depth == 0 and in_target:

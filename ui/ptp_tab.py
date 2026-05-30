@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QComboBox, QPushButton, QTextEdit, QGroupBox,
                                QFormLayout, QScrollArea)
 from PyQt6.QtCore import Qt, QProcess, QSettings
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QTextCursor
 import os
 import subprocess
 import re
@@ -244,7 +244,9 @@ class PTPTab(QWidget):
 
     def run_next_command(self):
         cmd = self.command_queue.pop(0)
-        self.terminal_output.append(f"Running: {cmd}")
+        self.terminal_output.insertPlainText(f"\nRunning: {cmd}\n")
+        scrollbar = self.terminal_output.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
         self.process.start("bash", ["-c", cmd])
 
     def handle_stdout(self):
@@ -344,7 +346,9 @@ class PTPTab(QWidget):
 
     def _start_ptp4l(self, iface):
         ptp_cmd = f"sudo ptp4l -f /etc/linuxptp/ptp4l.conf -i {iface} -m -l 6 -H"
-        self.terminal_output.append(f"Running: {ptp_cmd}")
+        self.terminal_output.insertPlainText(f"\nRunning: {ptp_cmd}\n")
+        scrollbar = self.terminal_output.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
         self.ptp_process = QProcess()
         self.ptp_process.readyReadStandardOutput.connect(self.handle_stdout)
         self.ptp_process.readyReadStandardError.connect(self.handle_stderr)

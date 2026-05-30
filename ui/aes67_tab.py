@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QTextEdit, QGroupBox, QCheckBox,
                                QScrollArea)
-from PyQt6.QtCore import QProcess, QProcessEnvironment
+from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer
 from PyQt6.QtGui import QFont
 import os
 import pwd
@@ -12,13 +12,18 @@ from core.aes67_config import AES67Config
 
 
 class AES67Tab(QWidget):
-    def __init__(self):
+    def __init__(self, ptp_tab=None):
         super().__init__()
         self.config = None
         self.process = None
         self.is_running = False
+        self.ptp_tab = ptp_tab
         self._init_config()
         self.init_ui()
+        self.ptp_check_timer = QTimer()
+        self.ptp_check_timer.timeout.connect(self._check_ptp_state)
+        self.ptp_check_timer.start(1000)
+        self._check_ptp_state()
 
     def _init_config(self):
         user_home = self._get_user_home()
@@ -51,7 +56,12 @@ class AES67Tab(QWidget):
             QPushButton:hover {
                 background-color: #45a049;
             }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
         """)
+        self.start_btn.setToolTip("PTP clock not ready.\nWait for synchronization ≤1000ns or Grand Master.")
         self.start_btn.clicked.connect(self.start_aes67)
         button_layout.addWidget(self.start_btn)
 
@@ -115,6 +125,32 @@ class AES67Tab(QWidget):
         main = QVBoxLayout(self)
         main.setContentsMargins(0, 0, 0, 0)
         main.addWidget(scroll)
+
+    def _check_ptp_state(self):
+        if self.is_running:
+            return
+        if self.ptp_tab is None:
+            self.start_btn.setEnabled(True)
+            self.start_btn.setToolTip("")
+            return
+        ptp_ready = (
+            getattr(self.ptp_tab, 'is_ptp_running', False) and (
+                getattr(self.ptp_tab, '_ptp_state', '') == 'MASTER' or
+                (
+                    getattr(self.ptp_tab, '_ptp_state', '') == 'SLAVE' and
+                    getattr(self.ptp_tab, '_ptp_offset', None) is not None and
+                    getattr(self.ptp_tab, '_ptp_offset', None) <= 1000
+                )
+            )
+        )
+        self.start_btn.setEnabled(ptp_ready)
+        if not ptp_ready:
+            self.start_btn.setToolTip(
+                "PTP clock not ready.\n"
+                "Wait for PTP synchronization (offset ≤1000ns or Grand Master)."
+            )
+        else:
+            self.start_btn.setToolTip("")
 
     def start_aes67(self):
         try:
@@ -181,6 +217,7 @@ class AES67Tab(QWidget):
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
             self.verbose_cb.setEnabled(False)
+            self.ptp_check_timer.stop()
 
         except Exception as e:
             self.terminal_output.append(f"Error: {str(e)}")
@@ -196,10 +233,11 @@ class AES67Tab(QWidget):
                 self.process.waitForFinished()
             self.is_running = False
             self.process = None
-            self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
             self.verbose_cb.setEnabled(True)
             self.terminal_output.append("pipewire-aes67 stopped.")
+            self.ptp_check_timer.start(1000)
+            self._check_ptp_state()
 
     def open_config(self):
         if os.path.exists(self.config_path):
@@ -267,7 +305,8 @@ class AES67Tab(QWidget):
     def process_finished(self, exit_code, exit_status):
         self.is_running = False
         self.process = None
-        self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.verbose_cb.setEnabled(True)
         self.terminal_output.append(f"pipewire-aes67 exited with code {exit_code}")
+        self.ptp_check_timer.start(1000)
+        self._check_ptp_state()

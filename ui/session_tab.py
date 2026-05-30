@@ -1,9 +1,11 @@
 """Session Tab – Quick-Start, System-Status, Versions, Routing-Tools."""
 
+import os
 import subprocess
 import re
 import shutil
 import sys
+import pwd
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -13,6 +15,48 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor
 
 from core.version import __version__, __app_name__
+from ui.pipewire_tab import _user_env
+
+
+def _fix_flatpak_dirs():
+    """Fix stale root-owned flatpak dirs in user's runtime dir (von vorherigen root-Aufrufen)."""
+    sudo_uid = os.environ.get('SUDO_UID', '1000')
+    try:
+        pw = pwd.getpwuid(int(sudo_uid))
+        uid, gid = pw.pw_uid, pw.pw_gid
+        flatpak_dir = f'/run/user/{uid}/.flatpak'
+        if not os.path.isdir(flatpak_dir):
+            return
+        for root, dirs, files in os.walk(flatpak_dir):
+            for name in dirs + files:
+                path = os.path.join(root, name)
+                try:
+                    if os.stat(path).st_uid == 0:
+                        os.chown(path, uid, gid)
+                except (PermissionError, FileNotFoundError):
+                    pass
+    except (KeyError, PermissionError, OSError):
+        pass
+
+
+def _set_user_uid():
+    """Setzt UID/GID auf den echten User (nicht root) im Child-Process vor exec()."""
+    sudo_uid = os.environ.get('SUDO_UID')
+    if sudo_uid:
+        try:
+            pw = pwd.getpwuid(int(sudo_uid))
+            os.setgid(pw.pw_gid)
+            os.setuid(pw.pw_uid)
+        except (KeyError, PermissionError, OSError):
+            pass
+
+
+def _flatpak_env():
+    """User-Env ohne SUDO_*-Variablen (flatpak erkennt sonst sudo)."""
+    env = _user_env()
+    for key in ('SUDO_UID', 'SUDO_USER', 'SUDO_GID', 'SUDO_COMMAND'):
+        env.pop(key, None)
+    return env
 
 
 class SessionTab(QWidget):
@@ -23,6 +67,9 @@ class SessionTab(QWidget):
         self.pw = pipewire_tab
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._update_status)
+        self._waiting_for_ptp = False
+        self._ptp_wait_timer = QTimer(self)
+        self._ptp_wait_timer.timeout.connect(self._check_ptp_and_start_aes67)
         self.init_ui()
         self._timer.start(2000)
 
@@ -58,6 +105,10 @@ class SessionTab(QWidget):
         qs_layout.addWidget(self.stop_btn)
         qs_layout.addStretch()
         layout.addWidget(qs_group)
+
+        self.session_state_label = QLabel('')
+        self.session_state_label.setStyleSheet('color: #888; font-size: 11px; padding-left: 4px;')
+        layout.addWidget(self.session_state_label)
 
         # ── System Status ──
         ss_group = QGroupBox('System Status')
@@ -139,20 +190,36 @@ class SessionTab(QWidget):
                 return ''
 
         pw_ver = get_ver('pipewire')
-        ptp_ver = get_ver('ptp4l')
+        ptp_ver = get_ver('ptp4l', '-v')
         py_ver = f'{sys.version_info.major}.{sys.version_info.minor}'
         from PyQt6.QtCore import PYQT_VERSION_STR
 
-        def ver_line(name, ver, ok_color='#4caf50'):
-            mark = '\u2713' if ver else '\u2717'
-            color = ok_color if ver else '#f44336'
+        MIN_VERSIONS = {
+            'PipeWire': '1.1',
+            'LinuxPTP': '4.0',
+        }
+
+        def _parse_version(v):
+            parts = v.split('.')
+            try:
+                return tuple(int(x) for x in parts)
+            except ValueError:
+                return ()
+
+        def ver_line(name, ver, min_ver=None, ok_color='#4caf50'):
+            ok = bool(ver) and (min_ver is None or _parse_version(ver) >= _parse_version(min_ver))
+            mark = '\u2713' if ok else '\u2717'
+            color = ok_color if ok else '#f44336'
             v = ver or '\u2014'
-            lbl = QLabel(f'<span style="color: {color};">{mark}</span> {name}  {v}')
+            req = f' <span style="color: #888;">(min {min_ver})</span>' if min_ver else ''
+            lbl = QLabel(
+                f'<span style="color: {color};">{mark}</span> {name}  {v}{req}'
+            )
             lbl.setTextFormat(Qt.TextFormat.RichText)
             ver_layout.addWidget(lbl)
 
-        ver_line('PipeWire', pw_ver)
-        ver_line('LinuxPTP', ptp_ver)
+        ver_line('PipeWire', pw_ver, MIN_VERSIONS.get('PipeWire'))
+        ver_line('LinuxPTP', ptp_ver, MIN_VERSIONS.get('LinuxPTP'))
         ver_line('Python', py_ver)
         ver_line('PyQt6', PYQT_VERSION_STR)
 
@@ -204,7 +271,24 @@ class SessionTab(QWidget):
                 mode, args = found
                 label = f'{cmd} ({mode})' if mode == 'flatpak' else cmd
                 btn.setToolTip(f'{label} \u00f6ffnen')
-                btn.clicked.connect(lambda checked, a=args: subprocess.Popen(a))
+                if mode == 'flatpak':
+                    # Flatpak: stale root-owned Dirs fixen + als User starten
+                    def _launch_flatpak(app_id):
+                        _fix_flatpak_dirs()
+                        subprocess.Popen(
+                            ['flatpak', 'run', app_id],
+                            env=_flatpak_env(),
+                            preexec_fn=_set_user_uid
+                        )
+                    btn.clicked.connect(
+                        lambda checked, a=args: _launch_flatpak(a[-1])
+                    )
+                else:
+                    btn.clicked.connect(
+                        lambda checked, a=args: subprocess.Popen(
+                            a, env=_user_env()
+                        )
+                    )
             else:
                 btn.setToolTip(f'{cmd} not found (PATH/Flatpak)')
                 btn.setEnabled(False)
@@ -230,22 +314,55 @@ class SessionTab(QWidget):
     def _session_start(self):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
+        self.session_state_label.setText('Starting PTP...')
 
         # 1. PTP starten
         if hasattr(self.ptp, 'start_ptp'):
             self.ptp.start_ptp()
-        # 2. Kurz warten, dann AES67 starten
-        QTimer.singleShot(2000, self._start_aes67)
+        # 2. Auf PTP-Sync warten, dann AES67 starten
+        self._waiting_for_ptp = True
+        self._ptp_wait_timer.start(500)
 
-    def _start_aes67(self):
+    def _check_ptp_and_start_aes67(self):
+        ptp_running = getattr(self.ptp, 'is_ptp_running', False)
+        if not ptp_running:
+            self.session_state_label.setText('PTP failed to start or exited.')
+            self._ptp_wait_timer.stop()
+            self._waiting_for_ptp = False
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            return
+
+        ptp_state = getattr(self.ptp, '_ptp_state', '')
+        ptp_offset = getattr(self.ptp, '_ptp_offset', None)
+        ptp_ready = (
+            ptp_state == 'MASTER' or
+            (ptp_state == 'SLAVE' and ptp_offset is not None and ptp_offset <= 1000)
+        )
+        if not ptp_ready:
+            self.session_state_label.setText(
+                f'Waiting for PTP sync... (state: {ptp_state or "INIT"}, '
+                f'offset: {f"{ptp_offset}ns" if ptp_offset is not None else "?"})'
+            )
+            return
+
+        # PTP sync ready → start AES67
+        self._ptp_wait_timer.stop()
+        self._waiting_for_ptp = False
+        self.session_state_label.setText('PTP sync OK, starting AES67...')
         if hasattr(self.aes67, 'start_aes67'):
             self.aes67.start_aes67()
+        QTimer.singleShot(3000, lambda: self.session_state_label.setText(''))
 
     def _session_stop(self):
+        if self._waiting_for_ptp:
+            self._ptp_wait_timer.stop()
+            self._waiting_for_ptp = False
         if hasattr(self.aes67, 'stop_aes67'):
             self.aes67.stop_aes67()
         if hasattr(self.ptp, 'stop_ptp'):
             self.ptp.stop_ptp()
+        self.session_state_label.setText('')
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
 

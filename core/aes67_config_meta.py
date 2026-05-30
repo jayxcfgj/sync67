@@ -305,9 +305,9 @@ CONFIG_PARAMS: list[ParamDef] = [
              ('args', 'node.channel-names'), 'multiline',
              '["CH1", "CH2"]',
              label='Channel Names',
-             tooltip='Names of the audio channels.\n'
-                     'Visible to AES67 receivers.\n'
-                     'Format: ["CH1", "CH2", ...]',
+              tooltip='Names of the audio channels.\n'
+                      'Visible to AES67 receivers.\n'
+                      'Enter comma-separated values, e.g.: CH1, CH2',
              section='RTP Sink Output'),
 
     # ── stream.props (RTP Sink) ────────────────────────────────
