@@ -350,6 +350,8 @@ class PipeWireTab(QWidget):
         total_wait = 0.0
         total_busy = 0.0
         for n in self._last_nodes:
+            if n.get('is_child'):
+                continue
             name = n.get('name', '').lower()
             if 'rtp' not in name and 'aes67' not in name and 'ptp' not in name:
                 continue
