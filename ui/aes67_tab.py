@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QTextEdit, QGroupBox, QCheckBox,
-                               QScrollArea, QGridLayout, QProgressBar)
+                               QScrollArea, QGridLayout, QProgressBar, QSizePolicy)
 from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer, Qt
 from PyQt6.QtGui import QFont, QColor, QTextCharFormat
 import os
@@ -126,7 +126,7 @@ class AES67Tab(QWidget):
         # DSP Load
         dsp_group = QGroupBox("DSP Load")
         dsp_group.setObjectName("AES67Dsp")
-        dsp_group.setMinimumWidth(200)
+        dsp_group.setMinimumWidth(220)
         dsp_group.setStyleSheet("""
             QGroupBox#AES67Dsp { font-size: 11px; padding: 2px 4px; border: 1px solid #555; border-radius: 4px; margin-top: 14px; }
             QGroupBox#AES67Dsp::title { subcontrol-origin: margin; left: 6px; padding: 0 2px; }
@@ -152,6 +152,7 @@ class AES67Tab(QWidget):
         # ── Status panel (flexible width) ──
         status_group = QGroupBox("AES67 Stream Health")
         status_group.setObjectName("AES67StreamHealth")
+        status_group.setMinimumHeight(180)
         status_group.setStyleSheet("""
             QGroupBox#AES67StreamHealth {
                 font-size: 13px; font-weight: bold; color: #e0e0e0;
@@ -219,17 +220,19 @@ class AES67Tab(QWidget):
         status_grid.addWidget(sep, row, 0, 1, 2)
         row += 1
 
-        status_inner = QHBoxLayout()
-        status_inner.addLayout(status_grid)
-        status_inner.addStretch()
-        status_inner.addWidget(dsp_group, alignment=Qt.AlignmentFlag.AlignTop)
-
         self._last_summary = QLabel("")
         self._last_summary.setWordWrap(True)
         self._last_summary.setStyleSheet("font-size: 11px; color: #e0e0e0; padding: 0 6px 2px 6px;")
+        self._last_summary.setMinimumHeight(32)
         self._last_advice = QLabel("")
         self._last_advice.setWordWrap(True)
         self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 6px 2px 6px;")
+        self._last_advice.setMinimumHeight(32)
+
+        status_inner = QHBoxLayout()
+        status_inner.addLayout(status_grid, stretch=1)
+        status_inner.addSpacing(8)
+        status_inner.addWidget(dsp_group, stretch=0, alignment=Qt.AlignmentFlag.AlignTop)
 
         status_outer = QVBoxLayout()
         status_outer.addLayout(status_inner)
