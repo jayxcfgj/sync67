@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QTextEdit, QGroupBox, QCheckBox,
-                               QScrollArea, QGridLayout, QProgressBar, QSizePolicy)
+                               QScrollArea, QGridLayout, QProgressBar)
 from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer, Qt
 from PyQt6.QtGui import QFont, QColor, QTextCharFormat
 import os
@@ -152,7 +152,6 @@ class AES67Tab(QWidget):
         # ── Status panel (flexible width) ──
         status_group = QGroupBox("AES67 Stream Health")
         status_group.setObjectName("AES67StreamHealth")
-        status_group.setMinimumHeight(180)
         status_group.setStyleSheet("""
             QGroupBox#AES67StreamHealth {
                 font-size: 13px; font-weight: bold; color: #e0e0e0;
@@ -222,23 +221,25 @@ class AES67Tab(QWidget):
 
         self._last_summary = QLabel("")
         self._last_summary.setWordWrap(True)
-        self._last_summary.setStyleSheet("font-size: 11px; color: #e0e0e0; padding: 0 6px 2px 6px;")
-        self._last_summary.setMinimumHeight(32)
+        self._last_summary.setStyleSheet("font-size: 11px; color: #e0e0e0; padding: 0 4px 1px 4px;")
         self._last_advice = QLabel("")
         self._last_advice.setWordWrap(True)
-        self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 6px 2px 6px;")
-        self._last_advice.setMinimumHeight(32)
+        self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 4px 1px 4px;")
+
+        right_col = QVBoxLayout()
+        right_col.setSpacing(2)
+        right_col.addWidget(dsp_group)
+        right_col.addSpacing(4)
+        right_col.addWidget(self._last_summary)
+        right_col.addWidget(self._last_advice)
+        right_col.addStretch()
 
         status_inner = QHBoxLayout()
-        status_inner.addLayout(status_grid, stretch=1)
+        status_inner.addLayout(status_grid, stretch=0)
         status_inner.addSpacing(8)
-        status_inner.addWidget(dsp_group, stretch=0, alignment=Qt.AlignmentFlag.AlignTop)
+        status_inner.addLayout(right_col, stretch=1)
 
-        status_outer = QVBoxLayout()
-        status_outer.addLayout(status_inner)
-        status_outer.addWidget(self._last_summary)
-        status_outer.addWidget(self._last_advice)
-        status_group.setLayout(status_outer)
+        status_group.setLayout(status_inner)
         top_row.addWidget(status_group, stretch=1)
 
         layout.addLayout(top_row)
