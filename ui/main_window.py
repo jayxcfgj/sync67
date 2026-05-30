@@ -19,10 +19,11 @@ class MainWindow(QMainWindow):
         self.ptp_tab = PTPTab()
         self.tabs.addTab(self.ptp_tab, "PTP")
 
-        self.aes67_tab = AES67Tab(ptp_tab=self.ptp_tab)
+        self.pipewire_tab = PipeWireTab()
+
+        self.aes67_tab = AES67Tab(ptp_tab=self.ptp_tab, pipewire_tab=self.pipewire_tab)
         self.tabs.addTab(self.aes67_tab, "AES67")
 
-        self.pipewire_tab = PipeWireTab()
         self.tabs.addTab(self.pipewire_tab, "PipeWire")
 
         self.session_tab = SessionTab(self.ptp_tab, self.aes67_tab, self.pipewire_tab)

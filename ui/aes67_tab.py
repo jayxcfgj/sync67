@@ -35,12 +35,13 @@ _COLOR_MAP = {
 
 
 class AES67Tab(QWidget):
-    def __init__(self, ptp_tab=None):
+    def __init__(self, ptp_tab=None, pipewire_tab=None):
         super().__init__()
         self.config = None
         self.process = None
         self.is_running = False
         self.ptp_tab = ptp_tab
+        self.pipewire_tab = pipewire_tab
         self._init_config()
         self.parser = AES67LogParser()
         self._stdout_buffer = ''
@@ -121,6 +122,23 @@ class AES67Tab(QWidget):
         config_group.setLayout(config_layout)
         config_group.setStyleSheet("QGroupBox { font-size: 11px; }")
         btn_col.addWidget(config_group)
+
+        # DSP Load
+        dsp_group = QGroupBox("DSP Load")
+        dsp_group.setStyleSheet("QGroupBox { font-size: 11px; }")
+        dsp_layout = QVBoxLayout(dsp_group)
+        self.aes67_dsp_label = QLabel("0%")
+        self.aes67_dsp_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #888;")
+        self.aes67_dsp_bar = QProgressBar()
+        self.aes67_dsp_bar.setRange(0, 100)
+        self.aes67_dsp_bar.setValue(0)
+        self.aes67_dsp_bar.setFixedHeight(14)
+        self.aes67_dsp_bar.setTextVisible(False)
+        self.aes67_dsp_bar.setStyleSheet("QProgressBar { background-color: #333; border: none; border-radius: 2px; }")
+        dsp_layout.addWidget(self.aes67_dsp_label)
+        dsp_layout.addWidget(self.aes67_dsp_bar)
+        btn_col.addWidget(dsp_group)
+
         btn_col.addStretch()
 
         top_row.addLayout(btn_col)
@@ -235,6 +253,23 @@ class AES67Tab(QWidget):
         self._update_status_panel()
 
     def _update_status_panel(self):
+        # DSP Load from PipeWire tab
+        if self.pipewire_tab is not None:
+            dsp_val = 0
+            try:
+                dsp_text = self.pipewire_tab.dsp_label.text().rstrip('%')
+                dsp_val = int(dsp_text) if dsp_text.isdigit() else 0
+            except (AttributeError, ValueError):
+                pass
+            self.aes67_dsp_label.setText(f"{dsp_val}%")
+            self.aes67_dsp_bar.setValue(dsp_val)
+            c = '#4caf50' if dsp_val < 50 else '#ffc107' if dsp_val < 80 else '#f44336'
+            self.aes67_dsp_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {c};")
+            self.aes67_dsp_bar.setStyleSheet(f"""
+                QProgressBar {{ background-color: #333; border: none; border-radius: 2px; min-height: 14px; }}
+                QProgressBar::chunk {{ background-color: {c}; border-radius: 2px; }}
+            """)
+
         if not self.is_running:
             self.health_label.setText("\u25cf Idle")
             self.health_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #888;")
