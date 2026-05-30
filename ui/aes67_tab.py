@@ -125,9 +125,10 @@ class AES67Tab(QWidget):
 
         # DSP Load
         dsp_group = QGroupBox("DSP Load")
+        dsp_group.setObjectName("AES67Dsp")
         dsp_group.setStyleSheet("""
-            QGroupBox { font-size: 11px; padding: 0; margin: 0; border: 1px solid #555; border-radius: 4px; margin-top: 6px; }
-            QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 3px; }
+            QGroupBox#AES67Dsp { font-size: 11px; padding: 2px 4px; border: 1px solid #555; border-radius: 4px; margin-top: 12px; }
+            QGroupBox#AES67Dsp::title { subcontrol-origin: margin; left: 6px; padding: 0 2px; }
         """)
         dsp_layout = QVBoxLayout(dsp_group)
         dsp_layout.setContentsMargins(4, 2, 4, 2)
@@ -149,13 +150,14 @@ class AES67Tab(QWidget):
 
         # ── Status panel (flexible width) ──
         status_group = QGroupBox("AES67 Stream Health")
+        status_group.setObjectName("AES67StreamHealth")
         status_group.setStyleSheet("""
-            QGroupBox {
+            QGroupBox#AES67StreamHealth {
                 font-size: 13px; font-weight: bold; color: #e0e0e0;
                 border: 1px solid #555; border-radius: 6px;
                 margin-top: 12px; padding-top: 16px;
             }
-            QGroupBox::title {
+            QGroupBox#AES67StreamHealth::title {
                 subcontrol-origin: margin;
                 left: 10px; padding: 0 6px;
             }
