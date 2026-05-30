@@ -126,16 +126,16 @@ class AES67Tab(QWidget):
         # DSP Load
         dsp_group = QGroupBox("DSP Load")
         dsp_group.setObjectName("AES67Dsp")
-        dsp_group.setMaximumHeight(58)
+        dsp_group.setMinimumWidth(140)
         dsp_group.setStyleSheet("""
-            QGroupBox#AES67Dsp { font-size: 11px; padding: 2px 4px; border: 1px solid #555; border-radius: 4px; margin-top: 12px; }
+            QGroupBox#AES67Dsp { font-size: 11px; padding: 2px 4px; border: 1px solid #555; border-radius: 4px; margin-top: 14px; }
             QGroupBox#AES67Dsp::title { subcontrol-origin: margin; left: 6px; padding: 0 2px; }
         """)
         dsp_layout = QVBoxLayout(dsp_group)
-        dsp_layout.setContentsMargins(4, 2, 4, 2)
-        dsp_layout.setSpacing(2)
+        dsp_layout.setContentsMargins(4, 4, 4, 4)
+        dsp_layout.setSpacing(4)
         self.aes67_dsp_label = QLabel("0%")
-        self.aes67_dsp_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #888;")
+        self.aes67_dsp_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #888;")
         self.aes67_dsp_bar = QProgressBar()
         self.aes67_dsp_bar.setRange(0, 100)
         self.aes67_dsp_bar.setValue(0)
