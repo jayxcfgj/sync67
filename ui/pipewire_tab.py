@@ -345,6 +345,42 @@ class PipeWireTab(QWidget):
 
     # ─── pw-top ──────────────────────────────────────────────
 
+    @property
+    def aes67_dsp(self):
+        total_wait = 0.0
+        total_busy = 0.0
+        for n in self._last_nodes:
+            name = n.get('name', '').lower()
+            if 'rtp' not in name and 'aes67' not in name:
+                continue
+            txt = n.get('waiting', '---')
+            if txt.strip() not in ('---', '\u2014', ''):
+                txt = txt.strip().replace(',', '.')
+                m = re.match(r'([\d.]+)\s*(us|ms|s)?', txt)
+                if m:
+                    v = float(m.group(1))
+                    u = m.group(2) or ''
+                    if u == 'ms':
+                        v *= 1000
+                    elif u == 's':
+                        v *= 1_000_000
+                    total_wait += v
+            txt = n.get('busy', '---')
+            if txt.strip() not in ('---', '\u2014', ''):
+                txt = txt.strip().replace(',', '.')
+                m = re.match(r'([\d.]+)\s*(us|ms|s)?', txt)
+                if m:
+                    v = float(m.group(1))
+                    u = m.group(2) or ''
+                    if u == 'ms':
+                        v *= 1000
+                    elif u == 's':
+                        v *= 1_000_000
+                    total_busy += v
+        if total_wait + total_busy == 0:
+            return 0.0
+        return total_busy / (total_wait + total_busy) * 100
+
     def _update_all(self):
         self._refresh_rate()
         self._fetch_pwtop()

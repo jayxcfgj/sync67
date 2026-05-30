@@ -255,12 +255,7 @@ class AES67Tab(QWidget):
     def _update_status_panel(self):
         # DSP Load from PipeWire tab
         if self.pipewire_tab is not None:
-            dsp_val = 0
-            try:
-                dsp_text = self.pipewire_tab.dsp_label.text().rstrip('%')
-                dsp_val = int(dsp_text) if dsp_text.isdigit() else 0
-            except (AttributeError, ValueError):
-                pass
+            dsp_val = int(round(self.pipewire_tab.aes67_dsp))
             self.aes67_dsp_label.setText(f"{dsp_val}%")
             self.aes67_dsp_bar.setValue(dsp_val)
             c = '#4caf50' if dsp_val < 50 else '#ffc107' if dsp_val < 80 else '#f44336'
