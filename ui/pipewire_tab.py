@@ -338,6 +338,23 @@ class PipeWireTab(QWidget):
         else:
             self.latency_label.setText('\u2014')
 
+    @staticmethod
+    def _to_us(txt):
+        t = txt.strip()
+        if t in ('---', '\u2014', ''):
+            return 0.0
+        t = t.replace(',', '.')
+        m = re.match(r'([\d.]+)\s*(us|ms|s)?', t)
+        if m:
+            v = float(m.group(1))
+            u = m.group(2) or ''
+            if u == 'ms':
+                v *= 1000
+            elif u == 's':
+                v *= 1_000_000
+            return v
+        return 0.0
+
     def _reset_xruns(self):
         self._xruns_offset = getattr(self, '_current_total_xruns', 0)
         self.xruns_label.setText('0')
@@ -347,17 +364,21 @@ class PipeWireTab(QWidget):
 
     @property
     def aes67_dsp(self):
-        vals = []
+        driver = None
+        total_busy = 0.0
         for n in self._last_nodes:
             name = n.get('name', '').lower()
             if 'rtp' not in name and 'aes67' not in name and 'ptp' not in name:
                 continue
-            dsp = n.get('dsp', 0.0)
-            if dsp > 0:
-                vals.append(dsp)
-        if not vals:
+            total_busy += self._to_us(n.get('busy', '---'))
+            if not n.get('is_child') and 'ptp' in name:
+                driver = n
+        if driver is None:
             return 0.0
-        return max(vals)
+        cycle = self._to_us(driver.get('waiting', '---')) + self._to_us(driver.get('busy', '---'))
+        if cycle == 0:
+            return 0.0
+        return total_busy / cycle * 100
 
     def _update_all(self):
         self._refresh_rate()
@@ -567,24 +588,8 @@ class PipeWireTab(QWidget):
     def _update_status(self, nodes):
         running = [n for n in nodes if n['state'] == 'Running']
 
-        def to_us(txt):
-            t = txt.strip()
-            if t in ('---', '\u2014', ''):
-                return 0.0
-            t = t.replace(',', '.')
-            m = re.match(r'([\d.]+)\s*(us|ms|s)?', t)
-            if m:
-                v = float(m.group(1))
-                u = m.group(2) or ''
-                if u == 'ms':
-                    v *= 1000
-                elif u == 's':
-                    v *= 1_000_000
-                return v
-            return 0.0
-
-        total_wait = sum(to_us(n['waiting']) for n in running)
-        total_busy = sum(to_us(n['busy']) for n in running)
+        total_wait = sum(self._to_us(n['waiting']) for n in running)
+        total_busy = sum(self._to_us(n['busy']) for n in running)
 
         dsp_pct = (total_busy / (total_wait + total_busy) * 100) if (total_wait + total_busy) > 0 else 0.0
 

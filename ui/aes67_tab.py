@@ -160,11 +160,10 @@ class AES67Tab(QWidget):
         status_grid.setSpacing(3)
         status_grid.setColumnStretch(0, 0)
         status_grid.setColumnStretch(1, 1)
-        status_grid.setColumnStretch(2, 0)
 
         self.health_label = QLabel("\u25cf Idle")
         self.health_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #888;")
-        status_grid.addWidget(self.health_label, 0, 0, 1, 3)
+        status_grid.addWidget(self.health_label, 0, 0, 1, 2)
 
         self._counter_labels = {}
         self._reset_btns = {}
@@ -176,14 +175,18 @@ class AES67Tab(QWidget):
             val.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
             self._counter_labels[p['key']] = val
             rbtn = QPushButton("\u21ba")
-            rbtn.setFixedSize(26, 22)
+            rbtn.setFixedSize(24, 20)
             rbtn.setToolTip(f"Reset {p['label']}")
             rbtn.setStyleSheet("font-size: 10px; border: 1px solid #555; border-radius: 3px;")
             rbtn.clicked.connect(lambda checked, k=p['key']: self._reset_counter(k))
             self._reset_btns[p['key']] = rbtn
+            vb = QHBoxLayout()
+            vb.setSpacing(4)
+            vb.addWidget(val)
+            vb.addWidget(rbtn)
+            vb.addStretch()
             status_grid.addWidget(lbl, row, 0)
-            status_grid.addWidget(val, row, 1)
-            status_grid.addWidget(rbtn, row, 2)
+            status_grid.addLayout(vb, row, 1)
             row += 1
 
         other_lbl = QLabel("Other:")
@@ -191,30 +194,34 @@ class AES67Tab(QWidget):
         self._other_val = QLabel("0")
         self._other_val.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
         other_rbtn = QPushButton("\u21ba")
-        other_rbtn.setFixedSize(26, 22)
+        other_rbtn.setFixedSize(24, 20)
         other_rbtn.setToolTip("Reset Other")
         other_rbtn.setStyleSheet("font-size: 10px; border: 1px solid #555; border-radius: 3px;")
         other_rbtn.clicked.connect(lambda: self._reset_counter('other'))
+        vb = QHBoxLayout()
+        vb.setSpacing(4)
+        vb.addWidget(self._other_val)
+        vb.addWidget(other_rbtn)
+        vb.addStretch()
         status_grid.addWidget(other_lbl, row, 0)
-        status_grid.addWidget(self._other_val, row, 1)
-        status_grid.addWidget(other_rbtn, row, 2)
+        status_grid.addLayout(vb, row, 1)
         row += 1
 
         sep = QLabel("\u2500" * 28)
         sep.setStyleSheet("color: #555; font-size: 8px;")
-        status_grid.addWidget(sep, row, 0, 1, 3)
+        status_grid.addWidget(sep, row, 0, 1, 2)
         row += 1
 
         self._last_summary = QLabel("")
         self._last_summary.setWordWrap(True)
         self._last_summary.setStyleSheet("font-size: 11px; color: #e0e0e0; padding: 2px 0;")
-        status_grid.addWidget(self._last_summary, row, 0, 1, 3)
+        status_grid.addWidget(self._last_summary, row, 0, 1, 2)
         row += 1
 
         self._last_advice = QLabel("")
         self._last_advice.setWordWrap(True)
         self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 0 2px 0;")
-        status_grid.addWidget(self._last_advice, row, 0, 1, 3)
+        status_grid.addWidget(self._last_advice, row, 0, 1, 2)
 
         status_group.setLayout(status_grid)
         top_row.addWidget(status_group, stretch=1)
