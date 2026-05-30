@@ -217,7 +217,10 @@ def create_widget(param_def, current_value):
         d = d.strip('"')
         default_text = f'Default: {d}' if d else ''
     else:
-        default_text = f'Default: {param_def.default}' if param_def.default is not None else ''
+        d = str(param_def.default) if param_def.default is not None else ''
+        if d.startswith('"') and d.endswith('"'):
+            d = d[1:-1]
+        default_text = f'Default: {d}' if d else ''
     default_label = QLabel(default_text)
     default_label.setStyleSheet('color: gray; font-size: 10px;')
 
