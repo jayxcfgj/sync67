@@ -6,6 +6,7 @@ from PyQt6.QtGui import QFont, QColor, QTextCharFormat
 import os
 import pwd
 import shutil
+import time
 import traceback
 
 from core.aes67_config import AES67Config
@@ -50,6 +51,8 @@ class AES67Tab(QWidget):
         self._update_timer = QTimer(self)
         self._update_timer.setInterval(200)
         self._update_timer.timeout.connect(self._update_status_panel)
+        self._last_warning_time = 0.0
+        self._health_quiet_seconds = 30
         self.init_ui()
         self.ptp_check_timer = QTimer()
         self.ptp_check_timer.timeout.connect(self._check_ptp_state)
@@ -73,10 +76,11 @@ class AES67Tab(QWidget):
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        # ── Top row: Buttons (left) + Status panel (right) ──
+        # ── Top row: Buttons (left) + Status panel (fills remaining) ──
         top_row = QHBoxLayout()
 
-        left_col = QVBoxLayout()
+        btn_col = QVBoxLayout()
+        btn_row = QHBoxLayout()
         self.start_btn = QPushButton("Start pipewire-aes67")
         self.start_btn.setStyleSheet("""
             QPushButton {
@@ -88,7 +92,7 @@ class AES67Tab(QWidget):
         """)
         self.start_btn.setToolTip("PTP clock not ready.\nWait for synchronization \u22641000ns or Grand Master.")
         self.start_btn.clicked.connect(self.start_aes67)
-        left_col.addWidget(self.start_btn)
+        btn_row.addWidget(self.start_btn)
 
         self.stop_btn = QPushButton("Stop pipewire-aes67")
         self.stop_btn.setStyleSheet("""
@@ -101,7 +105,8 @@ class AES67Tab(QWidget):
         """)
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop_aes67)
-        left_col.addWidget(self.stop_btn)
+        btn_row.addWidget(self.stop_btn)
+        btn_col.addLayout(btn_row)
 
         # Config group unter den Buttons
         config_group = QGroupBox("Configuration")
@@ -115,12 +120,12 @@ class AES67Tab(QWidget):
         config_layout.addStretch()
         config_group.setLayout(config_layout)
         config_group.setStyleSheet("QGroupBox { font-size: 11px; }")
-        left_col.addWidget(config_group)
-        left_col.addStretch()
+        btn_col.addWidget(config_group)
+        btn_col.addStretch()
 
-        top_row.addLayout(left_col, stretch=1)
+        top_row.addLayout(btn_col)
 
-        # ── Status panel (right) ──
+        # ── Status panel (flexible width) ──
         status_group = QGroupBox("AES67 Stream Health")
         status_group.setStyleSheet("""
             QGroupBox {
@@ -134,10 +139,13 @@ class AES67Tab(QWidget):
             }
         """)
         status_grid = QGridLayout()
-        status_grid.setSpacing(4)
+        status_grid.setSpacing(3)
+        status_grid.setColumnStretch(0, 0)
+        status_grid.setColumnStretch(1, 1)
+        status_grid.setColumnStretch(2, 0)
 
-        self.health_label = QLabel("\u25cf OK")
-        self.health_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #4caf50;")
+        self.health_label = QLabel("\u25cf Idle")
+        self.health_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #888;")
         status_grid.addWidget(self.health_label, 0, 0, 1, 3)
 
         self._counter_labels = {}
@@ -150,7 +158,7 @@ class AES67Tab(QWidget):
             val.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
             self._counter_labels[p['key']] = val
             rbtn = QPushButton("\u21ba")
-            rbtn.setFixedSize(22, 22)
+            rbtn.setFixedSize(26, 22)
             rbtn.setToolTip(f"Reset {p['label']}")
             rbtn.setStyleSheet("font-size: 10px; border: 1px solid #555; border-radius: 3px;")
             rbtn.clicked.connect(lambda checked, k=p['key']: self._reset_counter(k))
@@ -165,7 +173,7 @@ class AES67Tab(QWidget):
         self._other_val = QLabel("0")
         self._other_val.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
         other_rbtn = QPushButton("\u21ba")
-        other_rbtn.setFixedSize(22, 22)
+        other_rbtn.setFixedSize(26, 22)
         other_rbtn.setToolTip("Reset Other")
         other_rbtn.setStyleSheet("font-size: 10px; border: 1px solid #555; border-radius: 3px;")
         other_rbtn.clicked.connect(lambda: self._reset_counter('other'))
@@ -174,7 +182,6 @@ class AES67Tab(QWidget):
         status_grid.addWidget(other_rbtn, row, 2)
         row += 1
 
-        # Separator
         sep = QLabel("\u2500" * 28)
         sep.setStyleSheet("color: #555; font-size: 8px;")
         status_grid.addWidget(sep, row, 0, 1, 3)
@@ -192,8 +199,7 @@ class AES67Tab(QWidget):
         status_grid.addWidget(self._last_advice, row, 0, 1, 3)
 
         status_group.setLayout(status_grid)
-        status_group.setFixedWidth(380)
-        top_row.addWidget(status_group, stretch=0)
+        top_row.addWidget(status_group, stretch=1)
 
         layout.addLayout(top_row)
 
@@ -229,6 +235,20 @@ class AES67Tab(QWidget):
         self._update_status_panel()
 
     def _update_status_panel(self):
+        if not self.is_running:
+            self.health_label.setText("\u25cf Idle")
+            self.health_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #888;")
+            for p in LOG_PATTERNS:
+                self._counter_labels[p['key']].setText(str(self.parser.counters[p['key']]))
+            self._other_val.setText(str(self.parser.other_count))
+            return
+
+        # Auto-Reset Health nach 30s ohne neue Warnungen/Fehler
+        if (self.parser.severity_counts['warning'] > 0 or self.parser.severity_counts['error'] > 0):
+            quiet = time.monotonic() - self._last_warning_time
+            if quiet > self._health_quiet_seconds:
+                self.parser.severity_counts['warning'] = 0
+                self.parser.severity_counts['error'] = 0
         sev = self.parser.aggregate_severity
         color_map = {'info': '#4caf50', 'warning': '#ffc107', 'error': '#f44336'}
         sev_labels = {'info': 'OK', 'warning': 'Warnings', 'error': 'Errors'}
@@ -261,6 +281,8 @@ class AES67Tab(QWidget):
         """Fügt Text mit Farbcodierung ins Terminal ein (Error=rot, Warning=gelb)."""
         for line in text.split('\n'):
             sev = self.parser.parse_line(line)
+            if sev and sev[0] in ('warning', 'error'):
+                self._last_warning_time = time.monotonic()
             cursor = self.terminal_output.textCursor()
             cursor.movePosition(cursor.MoveOperation.End)
             fmt = QTextCharFormat()
