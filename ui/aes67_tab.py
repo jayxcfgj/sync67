@@ -137,7 +137,6 @@ class AES67Tab(QWidget):
         self.aes67_dsp_bar.setStyleSheet("QProgressBar { background-color: #333; border: none; border-radius: 2px; }")
         dsp_layout.addWidget(self.aes67_dsp_label)
         dsp_layout.addWidget(self.aes67_dsp_bar)
-        btn_col.addWidget(dsp_group)
 
         btn_col.addStretch()
 
@@ -181,7 +180,7 @@ class AES67Tab(QWidget):
             rbtn.clicked.connect(lambda checked, k=p['key']: self._reset_counter(k))
             self._reset_btns[p['key']] = rbtn
             vb = QHBoxLayout()
-            vb.setSpacing(4)
+            vb.setSpacing(24)
             vb.addWidget(val)
             vb.addWidget(rbtn)
             vb.addStretch()
@@ -199,7 +198,7 @@ class AES67Tab(QWidget):
         other_rbtn.setStyleSheet("font-size: 10px; border: 1px solid #555; border-radius: 3px;")
         other_rbtn.clicked.connect(lambda: self._reset_counter('other'))
         vb = QHBoxLayout()
-        vb.setSpacing(4)
+        vb.setSpacing(24)
         vb.addWidget(self._other_val)
         vb.addWidget(other_rbtn)
         vb.addStretch()
@@ -223,7 +222,11 @@ class AES67Tab(QWidget):
         self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 0 2px 0;")
         status_grid.addWidget(self._last_advice, row, 0, 1, 2)
 
-        status_group.setLayout(status_grid)
+        status_inner = QHBoxLayout()
+        status_inner.addLayout(status_grid)
+        status_inner.addStretch()
+        status_inner.addWidget(dsp_group)
+        status_group.setLayout(status_inner)
         top_row.addWidget(status_group, stretch=1)
 
         layout.addLayout(top_row)
