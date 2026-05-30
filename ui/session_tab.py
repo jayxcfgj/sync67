@@ -135,7 +135,7 @@ class SessionTab(QWidget):
         # ── Sync / Xruns / DSP ──
         metrics = QHBoxLayout()
 
-        # Sync-Ampel
+        # Sync-Ampel (PTP)
         sync_box = QVBoxLayout()
         sync_box.addWidget(QLabel('PTP Sync'))
         self.sync_light = QLabel()
@@ -146,6 +146,19 @@ class SessionTab(QWidget):
         sync_box.addWidget(self.sync_light)
         sync_box.addWidget(self.sync_label)
         metrics.addLayout(sync_box)
+        metrics.addSpacing(24)
+
+        # AES67 Health
+        aes67_box = QVBoxLayout()
+        aes67_box.addWidget(QLabel('AES67 Health'))
+        self.aes67_light = QLabel()
+        self.aes67_light.setFixedSize(32, 32)
+        self.aes67_light.setStyleSheet('background-color: gray; border-radius: 16px;')
+        self.aes67_health_label = QLabel('\u2014')
+        self.aes67_health_label.setStyleSheet('font-size: 11px; color: #888;')
+        aes67_box.addWidget(self.aes67_light)
+        aes67_box.addWidget(self.aes67_health_label)
+        metrics.addLayout(aes67_box)
         metrics.addStretch()
 
         # Xruns
@@ -434,6 +447,20 @@ class SessionTab(QWidget):
         else:
             self.aes67_status.setText('\u25cf AES67: stopped')
             self.aes67_status.setStyleSheet('font-size: 13px; color: #888;')
+
+        # AES67 Health ampel
+        if aes67_running:
+            parser = getattr(self.aes67, 'parser', None)
+            sev = parser.aggregate_severity if parser else 'info'
+            color_map = {'info': '#4caf50', 'warning': '#ffc107', 'error': '#f44336'}
+            label_map = {'info': 'OK', 'warning': 'Warnings', 'error': 'Errors'}
+            self.aes67_light.setStyleSheet(f'background-color: {color_map[sev]}; border-radius: 16px;')
+            self.aes67_health_label.setText(label_map[sev])
+            self.aes67_health_label.setStyleSheet(f'font-size: 11px; color: {color_map[sev]};')
+        else:
+            self.aes67_light.setStyleSheet('background-color: gray; border-radius: 16px;')
+            self.aes67_health_label.setText('\u2014')
+            self.aes67_health_label.setStyleSheet('font-size: 11px; color: #888;')
 
         # PipeWire
         rate = getattr(self.pw, '_current_rate', 0)
