@@ -601,7 +601,7 @@ class AES67SettingsDialog(QDialog):
             self.widgets[pdef.key] = pw
 
         scroll.setWidget(content)
-        self.tabs.addTab(scroll, 'RTP SAP Input')
+        self.tabs.addTab(scroll, 'RTP SAP (Input)')
 
     def _create_sink_tab(self):
         """RTP Sink Output Tab with multi-instance support."""
@@ -623,7 +623,7 @@ class AES67SettingsDialog(QDialog):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
-        self.tabs.addTab(container, 'RTP Sink Output')
+        self.tabs.addTab(container, 'RTP Sink (Output)')
 
     def _rebuild_sink_tabs(self):
         """Rebuild the sink tab widget from config modules."""
