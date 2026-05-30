@@ -8,6 +8,20 @@ import subprocess
 import re
 import shutil
 import traceback
+
+_MAX_TERMINAL_LINES = 5000
+
+
+def _trim_terminal(edit, max_lines=_MAX_TERMINAL_LINES):
+    doc = edit.document()
+    if doc.blockCount() > max_lines:
+        cursor = edit.textCursor()
+        cursor.movePosition(cursor.MoveOperation.Start)
+        remove = doc.blockCount() - max_lines + 100
+        for _ in range(remove):
+            cursor.movePosition(cursor.MoveOperation.Down, cursor.MoveMode.KeepAnchor)
+        cursor.removeSelectedText()
+        cursor.deleteChar()
 from pathlib import Path
 
 class PTPTab(QWidget):
@@ -245,6 +259,7 @@ class PTPTab(QWidget):
     def run_next_command(self):
         cmd = self.command_queue.pop(0)
         self.terminal_output.insertPlainText(f"\nRunning: {cmd}\n")
+        _trim_terminal(self.terminal_output)
         scrollbar = self.terminal_output.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
         self.process.start("bash", ["-c", cmd])
@@ -256,6 +271,7 @@ class PTPTab(QWidget):
         data = process.readAllStandardOutput()
         stdout = bytes(data).decode('utf-8', errors='replace')
         self.terminal_output.insertPlainText(stdout)
+        _trim_terminal(self.terminal_output)
         self.terminal_output.ensureCursorVisible()
         self.parse_ptp_output(stdout)
 
@@ -266,6 +282,7 @@ class PTPTab(QWidget):
         data = process.readAllStandardError()
         stderr = bytes(data).decode('utf-8', errors='replace')
         self.terminal_output.insertPlainText(stderr)
+        _trim_terminal(self.terminal_output)
         self.terminal_output.ensureCursorVisible()
         self.parse_ptp_output(stderr)
 
@@ -347,6 +364,7 @@ class PTPTab(QWidget):
     def _start_ptp4l(self, iface):
         ptp_cmd = f"sudo ptp4l -f /etc/linuxptp/ptp4l.conf -i {iface} -m -l 6 -H"
         self.terminal_output.insertPlainText(f"\nRunning: {ptp_cmd}\n")
+        _trim_terminal(self.terminal_output)
         scrollbar = self.terminal_output.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
         self.ptp_process = QProcess()
