@@ -242,12 +242,6 @@ class SessionTab(QWidget):
         rt_group = QGroupBox('Routing Tools')
         rt_layout = QHBoxLayout(rt_group)
 
-        _FLATPAK_IDS = {
-            'qpwgraph': ['org.rncbc.qpwgraph'],
-            'helvum': ['org.pipewire.Helvum'],
-            'coppwr': ['io.github.dimtpap.coppwr'],
-        }
-
         _APPIMAGE_DIRS = [
             os.path.expanduser('~/Applications'),
             os.path.expanduser('~/.local/bin'),
@@ -264,10 +258,9 @@ class SessionTab(QWidget):
                     ['flatpak', 'list', '--columns=application'],
                     capture_output=True, text=True, timeout=5
                 )
-                installed = r.stdout.splitlines()
-                for app_id in _FLATPAK_IDS.get(cmd, []):
-                    if app_id in installed:
-                        return ('flatpak', ['flatpak', 'run', app_id])
+                for line in r.stdout.splitlines():
+                    if cmd.lower() in line.lower():
+                        return ('flatpak', ['flatpak', 'run', line.strip()])
             except Exception:
                 pass
             for d in _APPIMAGE_DIRS:
