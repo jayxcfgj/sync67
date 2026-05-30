@@ -4,6 +4,7 @@ import os
 import subprocess
 import re
 import shutil
+import stat
 import sys
 import pwd
 
@@ -247,8 +248,15 @@ class SessionTab(QWidget):
             'coppwr': ['io.github.dimtpap.coppwr'],
         }
 
+        _APPIMAGE_DIRS = [
+            os.path.expanduser('~/Applications'),
+            os.path.expanduser('~/.local/bin'),
+            '/opt',
+            '/usr/local/bin',
+        ]
+
         def _find_tool(cmd):
-            """Findet ein Tool via PATH, dann Flatpak."""
+            """Findet ein Tool via PATH, Flatpak oder AppImage."""
             if shutil.which(cmd):
                 return ('native', [cmd])
             try:
@@ -262,6 +270,17 @@ class SessionTab(QWidget):
                         return ('flatpak', ['flatpak', 'run', app_id])
             except Exception:
                 pass
+            for d in _APPIMAGE_DIRS:
+                if not os.path.isdir(d):
+                    continue
+                try:
+                    for f in os.listdir(d):
+                        if f.lower().endswith('.appimage') and cmd.lower() in f.lower():
+                            path = os.path.join(d, f)
+                            os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR)
+                            return ('appimage', [path])
+                except (PermissionError, FileNotFoundError):
+                    pass
             return None
 
         def make_tool_btn(name, cmd):
@@ -269,10 +288,8 @@ class SessionTab(QWidget):
             found = _find_tool(cmd)
             if found:
                 mode, args = found
-                label = f'{cmd} ({mode})' if mode == 'flatpak' else cmd
-                btn.setToolTip(f'{label} \u00f6ffnen')
                 if mode == 'flatpak':
-                    # Flatpak: stale root-owned Dirs fixen + als User starten
+                    label = f'{cmd} ({mode})'
                     def _launch_flatpak(app_id):
                         _fix_flatpak_dirs()
                         subprocess.Popen(
@@ -284,13 +301,15 @@ class SessionTab(QWidget):
                         lambda checked, a=args: _launch_flatpak(a[-1])
                     )
                 else:
+                    label = cmd
                     btn.clicked.connect(
                         lambda checked, a=args: subprocess.Popen(
                             a, env=_user_env()
                         )
                     )
+                btn.setToolTip(f'{label} \u00f6ffnen')
             else:
-                btn.setToolTip(f'{cmd} not found (PATH/Flatpak)')
+                btn.setToolTip(f'{cmd} not found (PATH/Flatpak/AppImage)')
                 btn.setEnabled(False)
                 btn.setStyleSheet('color: #666;')
             return btn
