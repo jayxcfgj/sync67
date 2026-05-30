@@ -216,8 +216,6 @@ class AES67Tab(QWidget):
 
         sep = QLabel("\u2500" * 28)
         sep.setStyleSheet("color: #555; font-size: 8px;")
-        status_grid.addWidget(sep, row, 0, 1, 2)
-        row += 1
 
         self._last_summary = QLabel("")
         self._last_summary.setWordWrap(True)
@@ -230,6 +228,7 @@ class AES67Tab(QWidget):
         right_col.setSpacing(2)
         right_col.addWidget(dsp_group)
         right_col.addSpacing(4)
+        right_col.addWidget(sep)
         right_col.addWidget(self._last_summary)
         right_col.addWidget(self._last_advice)
         right_col.addStretch()
