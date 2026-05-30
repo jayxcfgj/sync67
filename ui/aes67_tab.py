@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QTextEdit, QGroupBox, QCheckBox,
-                               QScrollArea, QGridLayout)
+                               QScrollArea, QGridLayout, QProgressBar)
 from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer, Qt
 from PyQt6.QtGui import QFont, QColor, QTextCharFormat
 import os
