@@ -351,7 +351,7 @@ class PipeWireTab(QWidget):
         total_busy = 0.0
         for n in self._last_nodes:
             name = n.get('name', '').lower()
-            if 'rtp' not in name and 'aes67' not in name:
+            if 'rtp' not in name and 'aes67' not in name and 'ptp' not in name:
                 continue
             txt = n.get('waiting', '---')
             if txt.strip() not in ('---', '\u2014', ''):
