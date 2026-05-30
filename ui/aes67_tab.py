@@ -126,7 +126,7 @@ class AES67Tab(QWidget):
         # DSP Load
         dsp_group = QGroupBox("DSP Load")
         dsp_group.setObjectName("AES67Dsp")
-        dsp_group.setMinimumWidth(140)
+        dsp_group.setMinimumWidth(200)
         dsp_group.setStyleSheet("""
             QGroupBox#AES67Dsp { font-size: 11px; padding: 2px 4px; border: 1px solid #555; border-radius: 4px; margin-top: 14px; }
             QGroupBox#AES67Dsp::title { subcontrol-origin: margin; left: 6px; padding: 0 2px; }
@@ -219,22 +219,23 @@ class AES67Tab(QWidget):
         status_grid.addWidget(sep, row, 0, 1, 2)
         row += 1
 
-        self._last_summary = QLabel("")
-        self._last_summary.setWordWrap(True)
-        self._last_summary.setStyleSheet("font-size: 11px; color: #e0e0e0; padding: 2px 0;")
-        status_grid.addWidget(self._last_summary, row, 0, 1, 2)
-        row += 1
-
-        self._last_advice = QLabel("")
-        self._last_advice.setWordWrap(True)
-        self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 0 2px 0;")
-        status_grid.addWidget(self._last_advice, row, 0, 1, 2)
-
         status_inner = QHBoxLayout()
         status_inner.addLayout(status_grid)
         status_inner.addStretch()
         status_inner.addWidget(dsp_group, alignment=Qt.AlignmentFlag.AlignTop)
-        status_group.setLayout(status_inner)
+
+        self._last_summary = QLabel("")
+        self._last_summary.setWordWrap(True)
+        self._last_summary.setStyleSheet("font-size: 11px; color: #e0e0e0; padding: 0 6px 2px 6px;")
+        self._last_advice = QLabel("")
+        self._last_advice.setWordWrap(True)
+        self._last_advice.setStyleSheet("font-size: 10px; color: #888; padding: 0 6px 2px 6px;")
+
+        status_outer = QVBoxLayout()
+        status_outer.addLayout(status_inner)
+        status_outer.addWidget(self._last_summary)
+        status_outer.addWidget(self._last_advice)
+        status_group.setLayout(status_outer)
         top_row.addWidget(status_group, stretch=1)
 
         layout.addLayout(top_row)
