@@ -390,21 +390,41 @@ class SessionTab(QWidget):
             self.ptp_status.setText('\u25cf PTP: stopped')
             self.ptp_status.setStyleSheet('font-size: 13px; color: #888;')
 
-        # PTP Sync-Light
+        # PTP Sync-Light (gleiche Logik wie PTP-Tab)
+        ptp_state = getattr(self.ptp, '_ptp_state', '')
         offset = getattr(self.ptp, '_ptp_offset', None)
-        if offset is not None and ptp_running:
-            self.ptp_sync_label.setText(f'Interface: {self.ptp.interface_combo.currentText()}  \u00b1{offset}ns')
+        self.ptp_sync_label.setText(
+            f'State: {ptp_state or "\u2014"}'
+            + (f'  \u00b1{offset}ns' if offset is not None else '')
+        )
+        if ptp_state == 'MASTER':
+            color = '#2196F3'
+            label_text = 'Grand Master'
+        elif ptp_state == 'FAULTY':
+            color = '#f44336'
+            label_text = 'FAULTY'
+        elif ptp_state == 'LISTENING':
+            color = 'gray'
+            label_text = 'Listening...'
+        elif ptp_state == 'UNCALIBRATED':
+            color = 'orange'
+            label_text = 'Uncalibrated...'
+        elif offset is not None and ptp_state == 'SLAVE':
+            label_text = f'Slave ({offset}ns)'
             if offset <= 200:
                 color = '#4caf50'
             elif offset <= 1000:
                 color = '#ffc107'
             else:
                 color = '#f44336'
-            self.sync_light.setStyleSheet(f'background-color: {color}; border-radius: 16px;')
-            self.sync_label.setText(f'\u00b1{offset} ns')
+        elif ptp_running:
+            color = 'gray'
+            label_text = 'Initializing...'
         else:
-            self.sync_light.setStyleSheet('background-color: gray; border-radius: 16px;')
-            self.sync_label.setText('\u2014')
+            color = 'gray'
+            label_text = '\u2014'
+        self.sync_light.setStyleSheet(f'background-color: {color}; border-radius: 16px;')
+        self.sync_label.setText(label_text)
 
         # AES67
         aes67_running = getattr(self.aes67, 'is_running', False)
