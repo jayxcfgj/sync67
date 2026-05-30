@@ -24,8 +24,19 @@ LOG_PATTERNS = [
         'label': 'Timeout misses',
         'pattern': re.compile(r'missing timeout (\d+)'),
         'severity': 'warning',
-        'summary': 'A scheduled timeout was missed – the audio graph could not keep up.',
-        'advice': 'Reduce DSP load, increase quantum size, or check system CPU frequency scaling.',
+        'summary': 'rtp-sink flush timeout – no audio data received.',
+        'advice': 'Normal when no audio stream is routed to the rtp-sink.\n'
+                  'Route audio (e.g. from Reaper) to resolve.\n'
+                  'If timeouts persist with active streams, check DSP load and quantum size.',
+    },
+    {
+        'key': 'phc_reset',
+        'label': 'PHC resets',
+        'pattern': re.compile(r'node-driver\.c:\s*46\d+\s+on_timeout'),
+        'severity': 'warning',
+        'summary': 'PTP0-Driver PHC reset – clock error exceeded max_resync threshold.',
+        'advice': 'The PTP hardware clock is too imprecise for the current quantum.\n'
+                  'Increase max_resync in PTP0-Driver config or use a more precise NIC.',
     },
     {
         'key': 'timestamp_err',
@@ -86,7 +97,7 @@ class AES67LogParser:
             self.other_count = 0
         self.severity_counts = {'info': 0, 'warning': 0, 'error': 0}
         for k in self.counters:
-            self.severity_counts['warning' if k in ('overrun_read', 'overrun_write', 'timeout_miss') else 'error'] += self.counters[k]
+            self.severity_counts['warning' if k in ('overrun_read', 'overrun_write', 'timeout_miss', 'phc_reset') else 'error'] += self.counters[k]
         if self.other_count > 0:
             self.severity_counts['info'] += self.other_count
 

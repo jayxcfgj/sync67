@@ -79,6 +79,16 @@ CONFIG_PARAMS: list[ParamDef] = [
                      'Lower = more frequent resyncs.',
              section='PTP Clock',
              min_val=0.1, max_val=60.0, step=0.1),
+    ParamDef('max_resync', 'context.objects',
+             ('args', 'max_resync'), 'int',
+             48,
+             label='Max Resync Error (µs)',
+             tooltip='Maximum allowed PHC error before a clock reset is triggered.\n'
+                     'If the error after resync exceeds this value, the driver resets.\n'
+                     'Increase for imprecise PHCs (e.g. USB adapters).\n'
+                     'Default: 48µs (PipeWire internal).',
+             section='PTP Clock',
+             min_val=1, max_val=10000, step=10),
     ParamDef('object.export', 'context.objects',
              ('args', 'object.export'), 'bool',
              True,
