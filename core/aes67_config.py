@@ -239,7 +239,21 @@ class AES67Config:
             # Key didn't exist in raw_lines – insert it inside the args block
             section = keys[0]
             obj_spec = keys[1]
-            if section in ('context.modules', 'context.objects'):
+            if isinstance(obj_spec, int):
+                # Resolve index to factory/name string for raw-line scanning
+                if section == 'context.objects':
+                    objs = self._data.get('context.objects', [])
+                    for i, o in enumerate(objs):
+                        if isinstance(o, dict) and o.get('factory') and i == obj_spec:
+                            obj_spec = o['factory']
+                            break
+                elif section == 'context.modules':
+                    mods = self._data.get('context.modules', [])
+                    for i, m in enumerate(mods):
+                        if isinstance(m, dict) and m.get('name') and i == obj_spec:
+                            obj_spec = m['name']
+                            break
+            if isinstance(obj_spec, str) and section in ('context.modules', 'context.objects'):
                 insert_at = self._find_sub_block_end(section, obj_spec, 'args')
                 if insert_at is not None:
                     # Determine indent from the args = { line
