@@ -730,7 +730,8 @@ class AES67SettingsDialog(QDialog):
                 else:
                     keys = ('context.modules', pdef.module) + pdef.path
                 
-                self.config.set(value, *keys)
+                if not self.config.set(value, *keys):
+                    print(f"Warning: could not save {key}")
 
             # Handle system clock checkbox
             if self.system_clock_cb:
@@ -759,7 +760,8 @@ class AES67SettingsDialog(QDialog):
                     pdef = PARAM_MAP.get(key)
                     if pdef and pdef.module == 'libpipewire-module-rtp-sink':
                         keys = ('context.modules', tab.sink_index) + pdef.path
-                        self.config.set(val, *keys)
+                        if not self.config.set(val, *keys):
+                            print(f"Warning: could not save {key} for sink {tab.sink_index}")
 
             # Save stream.rules raw editor
             if hasattr(self, 'rules_editor'):

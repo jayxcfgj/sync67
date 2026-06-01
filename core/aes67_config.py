@@ -211,11 +211,13 @@ class AES67Config:
                 return False
 
         leaf_key = keys[-1]
-        if not isinstance(parent, dict) or leaf_key not in parent:
+        if not isinstance(parent, dict):
             return False
-        old = parent[leaf_key]
-        if old == value:
+
+        is_new = leaf_key not in parent
+        if not is_new and parent[leaf_key] == value:
             return False
+
         parent[leaf_key] = value
 
         # Update raw line
@@ -233,6 +235,23 @@ class AES67Config:
                     indent = m2.group('indent')
                     new_line = f"{indent}{leaf_key} = {format_value(value)}"
                     self._raw_lines[line_idx] = new_line
+        elif is_new and len(keys) >= 3:
+            # Key didn't exist in raw_lines – insert it inside the args block
+            section = keys[0]
+            obj_spec = keys[1]
+            if section in ('context.modules', 'context.objects'):
+                insert_at = self._find_sub_block_end(section, obj_spec, 'args')
+                if insert_at is not None:
+                    # Determine indent from the args = { line
+                    indent = '            '
+                    for lookback in range(insert_at - 1, -1, -1):
+                        raw = self._raw_lines[lookback]
+                        if 'args = {' in raw:
+                            args_indent = raw[:len(raw) - len(raw.lstrip())]
+                            indent = args_indent + '    '
+                            break
+                    new_line = f"{indent}{leaf_key} = {format_value(value)}"
+                    self._raw_lines.insert(insert_at, new_line)
         self._modified = True
         return True
 
@@ -744,6 +763,37 @@ class AES67Config:
                 depth -= 1
                 if depth == 0:
                     return idx
+        return None
+
+    def _find_sub_block_end(self, section, obj_spec, sub_block='args'):
+        """Find line index of the closing '}' of a sub_block (e.g. 'args').
+
+        Scans _raw_lines for a module/object matching obj_spec, finds its
+        ``sub_block = {`` and returns the line index of the matching ``}``.
+        Returns None if not found.
+        """
+        id_field = 'name' if section == 'context.modules' else 'factory'
+        found_obj = False
+        in_sub = False
+        depth = 0
+        for idx, line in enumerate(self._raw_lines):
+            stripped = line.strip()
+            if not found_obj:
+                if id_field in stripped and obj_spec in stripped and '{' in stripped:
+                    found_obj = True
+                continue
+            if not in_sub:
+                if f'{sub_block} = {{' in stripped:
+                    in_sub = True
+                    depth = 1
+                elif stripped.startswith('}'):
+                    return None
+                continue
+            opens = stripped.count('{')
+            closes = stripped.count('}')
+            depth += opens - closes
+            if depth <= 0:
+                return idx
         return None
 
     # ─── Module serialization (for add_rtp_sink) ─────────────────

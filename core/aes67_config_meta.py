@@ -47,14 +47,14 @@ CONFIG_PARAMS: list[ParamDef] = [
                      'Only used when no interface is specified.',
              section='PTP Clock'),
     ParamDef('clock.id', 'context.objects',
-             ('args', 'clock.id'), 'choice',
+             ('args', 'clock.id'), 'string',
              None,
              label='Clock ID',
              tooltip='Alternative clock source.\n'
-                     '"tai" = CLOCK_TAI (auch von NTP syncbar).\n'
-                     'Leave empty = automatic via interface/device.',
-             section='PTP Clock',
-             choices=['', 'tai']),
+                     'Leave empty = automatic via interface/device.\n'
+                     '"tai" = CLOCK_TAI (syncable via NTP).\n'
+                     'Or enter a custom clock ID (e.g. "42").',
+             section='PTP Clock'),
     ParamDef('clock.name', 'context.objects',
              ('args', 'clock.name'), 'string',
              '"clock.system.ptp0"',
