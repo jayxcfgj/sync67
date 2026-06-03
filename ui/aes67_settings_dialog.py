@@ -43,6 +43,24 @@ def _load_interfaces():
     return _IFACE_CACHE
 
 
+_PHC_CACHE = None
+
+def _load_phc_devices():
+    """Cached list of available PHC devices (/dev/ptp*)."""
+    global _PHC_CACHE
+    if _PHC_CACHE is not None:
+        return _PHC_CACHE
+    devices = []
+    try:
+        for entry in os.listdir('/sys/class/ptp/'):
+            if entry.startswith('ptp'):
+                devices.append(f'/dev/{entry}')
+    except Exception:
+        pass
+    _PHC_CACHE = sorted(devices)
+    return _PHC_CACHE
+
+
 def _strip_quotes(s):
     if isinstance(s, str) and s.startswith('"') and s.endswith('"'):
         return s[1:-1]
@@ -183,6 +201,46 @@ class MultilineWidget(ParamWidget):
             self.widget.setPlainText(str(value))
 
 
+_EMPTY_LABEL = '(empty – dedicated for phc2sys)'
+
+
+class InterfaceWidget(ParamWidget):
+    """ComboBox for network interfaces with an (empty) option."""
+
+    def get_value(self):
+        text = self.widget.currentText()
+        if text == _EMPTY_LABEL or text == '':
+            return ''
+        return text
+
+    def set_value(self, value):
+        val_str = str(value).strip('"')
+        for i in range(self.widget.count()):
+            if self.widget.itemText(i) == val_str:
+                self.widget.setCurrentIndex(i)
+                return
+        # Value not in list (e.g. saved empty) → select (empty) option
+        self.widget.setCurrentIndex(0)
+
+
+class PhcDeviceWidget(ParamWidget):
+    """ComboBox for PHC devices with an (empty) option."""
+
+    def get_value(self):
+        text = self.widget.currentText()
+        if text == _EMPTY_LABEL or text == '':
+            return ''
+        return text
+
+    def set_value(self, value):
+        val_str = str(value).strip('"')
+        for i in range(self.widget.count()):
+            if self.widget.itemText(i) == val_str:
+                self.widget.setCurrentIndex(i)
+                return
+        self.widget.setCurrentIndex(0)
+
+
 def create_widget(param_def, current_value):
     """Create the appropriate widget for a parameter definition."""
     ptype = param_def.type
@@ -281,8 +339,17 @@ def create_widget(param_def, current_value):
         w = QComboBox()
         w.setToolTip(tooltip)
         w.setMinimumWidth(200)
+        w.addItem(_EMPTY_LABEL)
         w.addItems(_load_interfaces())
-        pw = ChoiceWidget(param_def, w, default_label)
+        pw = InterfaceWidget(param_def, w, default_label)
+
+    elif ptype == 'phc_device':
+        w = QComboBox()
+        w.setToolTip(tooltip)
+        w.setMinimumWidth(200)
+        w.addItem(_EMPTY_LABEL)
+        w.addItems(_load_phc_devices())
+        pw = PhcDeviceWidget(param_def, w, default_label)
 
     elif ptype == 'ip':
         w = QLineEdit()
@@ -568,18 +635,27 @@ class AES67SettingsDialog(QDialog):
             form.addRow(container)
             self.widgets[pdef.key] = pw
 
-        # System-Clock Checkbox (special handling)
-        self.system_clock_cb = QCheckBox('Use System Clock (disable PHC)')
+        # System-Clock Checkbox (shortcut: comment out both interface + device)
+        self.system_clock_cb = QCheckBox('Use System Clock (dedicated for phc2sys)')
         self.system_clock_cb.setToolTip(
-            'When enabled: clock.interface is commented out.\n'
-            'The system clock is used instead of the PHC.\n'
-            'Needed when running as root and PHC returns timestamp 0.'
+            'When enabled: clock.interface and clock.device are commented out.\n'
+            'pipewire-aes67 will not manage the PHC directly.\n'
+            'Required when using phc2sys for clock synchronization.'
         )
-        # Check if clock.interface is currently commented out
-        is_commented = self._is_clock_interface_commented()
-        self.system_clock_cb.setChecked(is_commented)
-        self.system_clock_cb.stateChanged.connect(self._mark_changes)
+        # Check if clock.interface / clock.device is currently commented out
+        is_iface_commented = self._is_key_commented('context.objects', 0, 'args', 'clock.interface')
+        is_dev_commented = self._is_key_commented('context.objects', 0, 'args', 'clock.device')
+        self.system_clock_cb.setChecked(is_iface_commented or is_dev_commented)
+        self.system_clock_cb.stateChanged.connect(self._on_system_clock_toggled)
         form.addRow(self.system_clock_cb)
+
+        # Sync checkbox when dropdowns change
+        iface_w = self.widgets.get('clock.interface')
+        dev_w = self.widgets.get('clock.device')
+        if iface_w:
+            iface_w.widget.currentIndexChanged.connect(self._sync_system_clock_cb)
+        if dev_w:
+            dev_w.widget.currentIndexChanged.connect(self._sync_system_clock_cb)
 
         scroll.setWidget(content)
         self.tabs.addTab(scroll, 'PTP Clock')
@@ -692,27 +768,14 @@ class AES67SettingsDialog(QDialog):
         scroll.setWidget(content)
         self.tabs.addTab(scroll, 'Expert')
 
-    def _is_clock_interface_commented(self):
-        """Check if clock.interface is commented out in the PTP0-Driver block."""
-        if not self.config._loaded_path:
+    def _is_key_commented(self, *keys):
+        """Check if a key line is commented out in raw_lines."""
+        if not self.config._raw_lines:
             return False
-        try:
-            with open(self.config._loaded_path) as f:
-                lines = f.readlines()
-        except Exception:
+        line_idx = self.config._find_line_idx(list(keys))
+        if line_idx is None:
             return False
-        in_ptp_block = False
-        for line in lines:
-            stripped = line.strip()
-            if '{ factory = spa-node-factory' in stripped or ' factory = ' in stripped:
-                in_ptp_block = True
-                continue
-            if in_ptp_block:
-                if stripped.startswith('}'):
-                    break
-                if 'clock.interface' in stripped:
-                    return stripped.startswith('#')
-        return False
+        return self.config._raw_lines[line_idx].strip().startswith('#')
 
     # ── Actions ─────────────────────────────────────────────────
 
@@ -729,29 +792,22 @@ class AES67SettingsDialog(QDialog):
                     keys = ('context.objects', 0) + pdef.path
                 else:
                     keys = ('context.modules', pdef.module) + pdef.path
-                
-                if not self.config.set(value, *keys):
-                    print(f"Warning: could not save {key}")
 
-            # Handle system clock checkbox
-            if self.system_clock_cb:
-                use_system = self.system_clock_cb.isChecked()
-                if use_system:
-                    # Comment out clock.interface in raw text
-                    lines = self.config._raw_lines
-                    for idx, line in enumerate(lines):
-                        if 'clock.interface' in line and not line.strip().startswith('#'):
-                            lines[idx] = '# ' + line
-                            break
-                    self.config._modified = True
+                if isinstance(pw, (InterfaceWidget, PhcDeviceWidget)):
+                    if value == '':
+                        self.config.comment_key(*keys)
+                    else:
+                        self.config.uncomment_key(*keys)
+                        if not self.config.set(value, *keys):
+                            print(f"Warning: could not save {key}")
                 else:
-                    # Uncomment clock.interface
-                    lines = self.config._raw_lines
-                    for idx, line in enumerate(lines):
-                        stripped = line.strip()
-                        if stripped.startswith('#') and 'clock.interface' in stripped:
-                            lines[idx] = stripped.lstrip('# ')
-                            break
+                    if not self.config.set(value, *keys):
+                        print(f"Warning: could not save {key}")
+
+            # System clock checkbox – force-comment both interface and device
+            if self.system_clock_cb and self.system_clock_cb.isChecked():
+                self.config.comment_key('context.objects', 0, 'args', 'clock.interface')
+                self.config.comment_key('context.objects', 0, 'args', 'clock.device')
 
             # Collect sink tab values
             for tab in self.rtp_sink_tabs:
@@ -825,6 +881,30 @@ class AES67SettingsDialog(QDialog):
             val = self.config.get(*keys)
             if val is not None:
                 pw.set_value(val)
+        self._sync_system_clock_cb()
+        self._mark_changes()
+
+    def _sync_system_clock_cb(self):
+        """Sync the system-clock checkbox with the dropdown states."""
+        if not self.system_clock_cb:
+            return
+        iface_w = self.widgets.get('clock.interface')
+        dev_w = self.widgets.get('clock.device')
+        iface_empty = iface_w and iface_w.widget.currentIndex() == 0
+        dev_empty = dev_w and dev_w.widget.currentIndex() == 0
+        blocked = self.system_clock_cb.blockSignals(True)
+        self.system_clock_cb.setChecked(iface_empty or dev_empty)
+        self.system_clock_cb.blockSignals(blocked)
+
+    def _on_system_clock_toggled(self, checked):
+        """User toggled the system-clock checkbox → sync dropdowns."""
+        iface_w = self.widgets.get('clock.interface')
+        dev_w = self.widgets.get('clock.device')
+        if checked:
+            if iface_w:
+                iface_w.widget.setCurrentIndex(0)
+            if dev_w:
+                dev_w.widget.setCurrentIndex(0)
         self._mark_changes()
 
     def _mark_changes(self):

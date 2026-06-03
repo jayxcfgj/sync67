@@ -269,6 +269,45 @@ class AES67Config:
         self._modified = True
         return True
 
+    def comment_key(self, *keys):
+        """Comment out a key's line in _raw_lines by prepending '# '.
+
+        Returns True if a line was commented, False if not found/already commented.
+        """
+        if len(keys) < 2:
+            return False
+        line_idx = self._find_line_idx(keys)
+        if line_idx is None:
+            return False
+        line = self._raw_lines[line_idx]
+        stripped = line.strip()
+        if stripped.startswith('#'):
+            return False
+        indent = line[:len(line) - len(line.lstrip())]
+        self._raw_lines[line_idx] = f'{indent}# {stripped}'
+        self._modified = True
+        return True
+
+    def uncomment_key(self, *keys):
+        """Remove leading '# ' from a key's line in _raw_lines.
+
+        Returns True if a line was uncommented, False if not found/already active.
+        """
+        if len(keys) < 2:
+            return False
+        line_idx = self._find_line_idx(keys)
+        if line_idx is None:
+            return False
+        line = self._raw_lines[line_idx]
+        stripped = line.strip()
+        if not stripped.startswith('#'):
+            return False
+        uncommented = stripped.lstrip('#').strip()
+        indent = line[:len(line) - len(line.lstrip())]
+        self._raw_lines[line_idx] = f'{indent}{uncommented}'
+        self._modified = True
+        return True
+
     def get_default(self, *keys):
         cfg = AES67Config()
         try:

@@ -40,11 +40,12 @@ CONFIG_PARAMS: list[ParamDef] = [
                      'Select the same interface as configured in the PTP tab.',
              section='PTP Clock'),
     ParamDef('clock.device', 'context.objects',
-             ('args', 'clock.device'), 'string',
+             ('args', 'clock.device'), 'phc_device',
              '"/dev/ptp0"',
              label='PHC Device',
              tooltip='PTP Hardware Clock device.\n'
-                     'Only used when no interface is specified.',
+                     'Select (empty – dedicated for phc2sys) when phc2sys\n'
+                     'manages the clock independently of pipewire-aes67.',
              section='PTP Clock'),
     ParamDef('clock.id', 'context.objects',
              ('args', 'clock.id'), 'string',
