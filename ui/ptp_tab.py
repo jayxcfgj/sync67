@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QComboBox, QPushButton, QTextEdit, QGroupBox,
                                QFormLayout, QScrollArea)
-from PyQt6.QtCore import Qt, QProcess, QSettings
+from PyQt6.QtCore import Qt, QProcess, QSettings, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
 import os
 import subprocess
@@ -34,6 +34,10 @@ class PTPTab(QWidget):
         self._ptp_offset = None
         self._ptp_state = ""
 
+        self.phc2sys_process = None
+        self.is_phc2sys_running = False
+        self._phc2sys_offset = None
+
     def init_ui(self):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -41,87 +45,132 @@ class PTPTab(QWidget):
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        interface_group = QGroupBox("Network Interface")
-        interface_layout = QFormLayout()
+        # ── Two-column top section ───────────────────────────────
+        top_row = QHBoxLayout()
 
+        # ── Left: PTP4L ──────────────────────────────────────────
+        ptp4l_group = QGroupBox("PTP4L")
+        ptp4l_inner = QVBoxLayout(ptp4l_group)
+
+        iface_form = QFormLayout()
         self.interface_combo = QComboBox()
         self.interface_combo.setMinimumWidth(200)
-        interface_layout.addRow("Interface:", self.interface_combo)
+        iface_form.addRow("Interface:", self.interface_combo)
+        ptp4l_inner.addLayout(iface_form)
 
         self.settings_btn = QPushButton("Start Options")
         self.settings_btn.clicked.connect(self.open_settings)
-        interface_layout.addRow("", self.settings_btn)
+        ptp4l_inner.addWidget(self.settings_btn)
 
-        interface_group.setLayout(interface_layout)
-        layout.addWidget(interface_group)
+        self.ptp4l_edit_btn = QPushButton("PTP4L Config Editor")
+        self.ptp4l_edit_btn.clicked.connect(self.open_ptp4l_editor)
+        ptp4l_inner.addWidget(self.ptp4l_edit_btn)
 
-        button_layout = QHBoxLayout()
+        ptp4l_btn_row = QHBoxLayout()
         self.start_btn = QPushButton("START PTP")
         self.start_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 16px;
-                border-radius: 4px;
+                background-color: #4CAF50; color: white;
+                border: none; padding: 8px 16px;
+                font-size: 14px; border-radius: 4px;
             }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
+            QPushButton:hover { background-color: #45a049; }
         """)
         self.start_btn.clicked.connect(self.start_ptp)
-        button_layout.addWidget(self.start_btn)
+        ptp4l_btn_row.addWidget(self.start_btn)
 
         self.stop_btn = QPushButton("STOP PTP")
         self.stop_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f44336;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 16px;
-                border-radius: 4px;
+                background-color: #f44336; color: white;
+                border: none; padding: 8px 16px;
+                font-size: 14px; border-radius: 4px;
             }
-            QPushButton:hover {
-                background-color: #da190b;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
+            QPushButton:hover { background-color: #da190b; }
+            QPushButton:disabled { background-color: #cccccc; color: #666666; }
         """)
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop_ptp)
-        button_layout.addWidget(self.stop_btn)
+        ptp4l_btn_row.addWidget(self.stop_btn)
 
-        button_layout.addWidget(QLabel(" Sync Status:"))
+        ptp4l_btn_row.addWidget(QLabel("Sync:"))
         self.status_light = QLabel()
-        self.status_light.setFixedSize(24, 24)
-        self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
-        button_layout.addWidget(self.status_light)
+        self.status_light.setFixedSize(20, 20)
+        self.status_light.setStyleSheet("background-color: gray; border-radius: 10px;")
+        ptp4l_btn_row.addWidget(self.status_light)
         self.state_label = QLabel("")
-        self.state_label.setStyleSheet("color: #cccccc; font-size: 12px; padding-left: 4px;")
-        self.state_label.setMinimumWidth(100)
-        button_layout.addWidget(self.state_label)
+        self.state_label.setStyleSheet("color: #cccccc; font-size: 11px; padding-left: 2px;")
+        ptp4l_btn_row.addWidget(self.state_label)
+        ptp4l_btn_row.addStretch()
+        ptp4l_inner.addLayout(ptp4l_btn_row)
 
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
+        top_row.addWidget(ptp4l_group)
 
-        ptp4l_group = QGroupBox("PTP4L Configuration")
-        ptp4l_layout = QHBoxLayout(ptp4l_group)
-        self.ptp4l_open_btn = QPushButton("Open Config")
-        self.ptp4l_open_btn.clicked.connect(self.open_ptp4l_config)
-        self.ptp4l_edit_btn = QPushButton("PTP4L Config Editor")
-        self.ptp4l_edit_btn.clicked.connect(self.open_ptp4l_editor)
-        ptp4l_layout.addWidget(self.ptp4l_open_btn)
-        ptp4l_layout.addWidget(self.ptp4l_edit_btn)
-        ptp4l_layout.addStretch()
-        layout.addWidget(ptp4l_group)
+        # ── Right: phc2sys ───────────────────────────────────────
+        phc2sys_group = QGroupBox("phc2sys")
+        phc2sys_inner = QVBoxLayout(phc2sys_group)
 
+        phc2sys_btn_row = QHBoxLayout()
+        self.phc2sys_start_btn = QPushButton("Start phc2sys")
+        self.phc2sys_start_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50; color: white;
+                border: none; padding: 8px 16px;
+                font-size: 14px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:disabled { background-color: #555555; color: #888888; }
+        """)
+        self.phc2sys_start_btn.clicked.connect(self.start_phc2sys)
+        phc2sys_btn_row.addWidget(self.phc2sys_start_btn)
+
+        self.phc2sys_stop_btn = QPushButton("Stop")
+        self.phc2sys_stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336; color: white;
+                border: none; padding: 8px 16px;
+                font-size: 14px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #da190b; }
+            QPushButton:disabled { background-color: #cccccc; color: #666666; }
+        """)
+        self.phc2sys_stop_btn.setEnabled(False)
+        self.phc2sys_stop_btn.clicked.connect(self.stop_phc2sys)
+        phc2sys_btn_row.addWidget(self.phc2sys_stop_btn)
+
+        phc2sys_btn_row.addWidget(QLabel("Status:"))
+        self.phc2sys_light = QLabel()
+        self.phc2sys_light.setFixedSize(20, 20)
+        self.phc2sys_light.setStyleSheet("background-color: gray; border-radius: 10px;")
+        phc2sys_btn_row.addWidget(self.phc2sys_light)
+        self.phc2sys_state_label = QLabel("\u2014")
+        self.phc2sys_state_label.setStyleSheet("color: #cccccc; font-size: 11px; padding-left: 2px;")
+        phc2sys_btn_row.addWidget(self.phc2sys_state_label)
+        phc2sys_btn_row.addStretch()
+        phc2sys_inner.addLayout(phc2sys_btn_row)
+
+        self.phc2sys_offset_label = QLabel("Offset: \u2014")
+        self.phc2sys_offset_label.setStyleSheet("color: #cccccc; font-size: 12px; padding: 2px 0;")
+        phc2sys_inner.addWidget(self.phc2sys_offset_label)
+
+        self.phc2sys_config_btn = QPushButton("phc2sys Config...")
+        self.phc2sys_config_btn.clicked.connect(self.open_phc2sys_config)
+        phc2sys_inner.addWidget(self.phc2sys_config_btn)
+
+        top_row.addWidget(phc2sys_group)
+        layout.addLayout(top_row)
+
+        # ── Terminals (QSplitter) ────────────────────────────────
+        from PyQt6.QtWidgets import QSplitter
+        self.terminal_splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # ptp4l terminal
+        ptp4l_terminal_wrap = QVBoxLayout()
+        ptp4l_terminal_wrap.addWidget(QLabel("PTP4L Output:"))
         self.terminal_output = QTextEdit()
         self.terminal_output.setReadOnly(True)
         self.terminal_output.setFont(QFont("Courier New", 10))
+        self.terminal_output.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.terminal_output.setStyleSheet("""
             QTextEdit {
                 background-color: #000000;
@@ -129,8 +178,31 @@ class PTPTab(QWidget):
                 border: 1px solid #333333;
             }
         """)
-        layout.addWidget(QLabel("PTP Output:"))
-        layout.addWidget(self.terminal_output)
+        ptp4l_terminal_wrap.addWidget(self.terminal_output)
+        ptp4l_container = QWidget()
+        ptp4l_container.setLayout(ptp4l_terminal_wrap)
+        self.terminal_splitter.addWidget(ptp4l_container)
+
+        # phc2sys terminal
+        phc2sys_terminal_wrap = QVBoxLayout()
+        phc2sys_terminal_wrap.addWidget(QLabel("phc2sys Output:"))
+        self.phc2sys_terminal = QTextEdit()
+        self.phc2sys_terminal.setReadOnly(True)
+        self.phc2sys_terminal.setFont(QFont("Courier New", 10))
+        self.phc2sys_terminal.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self.phc2sys_terminal.setStyleSheet("""
+            QTextEdit {
+                background-color: #000000;
+                color: #E0E0E0;
+                border: 1px solid #333333;
+            }
+        """)
+        phc2sys_terminal_wrap.addWidget(self.phc2sys_terminal)
+        phc2sys_container = QWidget()
+        phc2sys_container.setLayout(phc2sys_terminal_wrap)
+        self.terminal_splitter.addWidget(phc2sys_container)
+
+        layout.addWidget(self.terminal_splitter)
 
         scroll.setWidget(content)
         main = QVBoxLayout(self)
@@ -141,6 +213,15 @@ class PTPTab(QWidget):
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
         self.process.readyReadStandardError.connect(self.handle_stderr)
         self.process.finished.connect(self.process_finished)
+
+        self.phc2sys_process = QProcess()
+        self.phc2sys_process.readyReadStandardOutput.connect(self._phc2sys_handle_stdout)
+        self.phc2sys_process.readyReadStandardError.connect(self._phc2sys_handle_stderr)
+        self.phc2sys_process.finished.connect(self._phc2sys_finished)
+
+        self._phc2sys_sync_check = QTimer()
+        self._phc2sys_sync_check.timeout.connect(self._phc2sys_check_sync)
+        self._phc2sys_sync_check.start(2000)
 
     def load_interfaces(self):
         try:
@@ -408,6 +489,9 @@ class PTPTab(QWidget):
         self.state_label.setText("")
 
     def ptp_process_finished(self, exit_code, exit_status):
+        # Stop phc2sys first if ptp4l died
+        if self.is_phc2sys_running:
+            self.stop_phc2sys()
         self.is_ptp_running = False
         self.ptp_process = None
         self.start_btn.setEnabled(True)
@@ -419,6 +503,9 @@ class PTPTab(QWidget):
             self.terminal_output.append(f"PTP process exited with code: {exit_code}")
 
     def stop_ptp(self):
+        # Stop phc2sys first if running
+        if self.is_phc2sys_running:
+            self.stop_phc2sys()
         if self.is_ptp_running and self.ptp_process:
             self.terminal_output.append("Stopping PTP...")
             self.ptp_process.terminate()
@@ -432,6 +519,134 @@ class PTPTab(QWidget):
             self.stop_btn.setEnabled(False)
             self._reset_status()
             self.terminal_output.append("PTP stopped.")
+
+    # ── phc2sys ──────────────────────────────────────────────────
+
+    def open_phc2sys_config(self):
+        from ui.phc2sys_config_dialog import Phc2sysConfigDialog
+        dialog = Phc2sysConfigDialog(self)
+        dialog.exec()
+
+    def _can_start_phc2sys(self):
+        return self.is_ptp_running and self._ptp_state in ('SLAVE', 'MASTER')
+
+    def start_phc2sys(self):
+        if self.is_phc2sys_running:
+            return
+        if not self._can_start_phc2sys():
+            self.phc2sys_terminal.append("PTP must be running and synced before starting phc2sys.")
+            return
+
+        from ui.phc2sys_config_dialog import Phc2sysConfigDialog
+        dlg = Phc2sysConfigDialog(self)
+        args = dlg.build_command()
+        if not args:
+            self.phc2sys_terminal.append("phc2sys: using config file – not implemented yet.")
+            return
+
+        cmd = ['sudo', 'phc2sys'] + args
+        cmd_str = ' '.join(cmd)
+        self.phc2sys_terminal.clear()
+        self.phc2sys_terminal.append(f"Running: {cmd_str}\n")
+
+        self.phc2sys_process = QProcess()
+        self.phc2sys_process.readyReadStandardOutput.connect(self._phc2sys_handle_stdout)
+        self.phc2sys_process.readyReadStandardError.connect(self._phc2sys_handle_stderr)
+        self.phc2sys_process.finished.connect(self._phc2sys_finished)
+        self.is_phc2sys_running = True
+        self.phc2sys_start_btn.setEnabled(False)
+        self.phc2sys_stop_btn.setEnabled(True)
+        self.phc2sys_process.start('bash', ['-c', cmd_str])
+
+    def stop_phc2sys(self):
+        if not self.is_phc2sys_running or not self.phc2sys_process:
+            return
+        self.phc2sys_terminal.append("\nStopping phc2sys...")
+        self.phc2sys_process.terminate()
+        if not self.phc2sys_process.waitForFinished(3000):
+            self.phc2sys_process.kill()
+            self.phc2sys_process.waitForFinished()
+        self._phc2sys_reset()
+        self.phc2sys_terminal.append("phc2sys stopped.")
+
+    def _phc2sys_handle_stdout(self):
+        data = self.phc2sys_process.readAllStandardOutput()
+        text = bytes(data).decode('utf-8', errors='replace')
+        self.phc2sys_terminal.insertPlainText(text)
+        _trim_terminal(self.phc2sys_terminal)
+        self.phc2sys_terminal.ensureCursorVisible()
+        self._phc2sys_parse_output(text)
+
+    def _phc2sys_handle_stderr(self):
+        data = self.phc2sys_process.readAllStandardError()
+        text = bytes(data).decode('utf-8', errors='replace')
+        self.phc2sys_terminal.insertPlainText(text)
+        _trim_terminal(self.phc2sys_terminal)
+        self.phc2sys_terminal.ensureCursorVisible()
+        self._phc2sys_parse_output(text)
+
+    def _phc2sys_parse_output(self, text):
+        # phc2sys offset output: "offset -42" or "rms 42 max 87"
+        m = re.search(r'rms\s+(\d+)\s+max\s+(\d+)', text)
+        if m:
+            self._phc2sys_offset = int(m.group(2))
+        else:
+            m = re.search(r'offset\s+(-?\d+)', text)
+            if m:
+                self._phc2sys_offset = abs(int(m.group(1)))
+        self._update_phc2sys_status()
+
+    def _update_phc2sys_status(self):
+        offset = self._phc2sys_offset
+        if offset is None:
+            color = 'gray'
+            label = '\u2014'
+        elif offset <= 10:
+            color = '#4caf50'
+            label = f'{offset} ns'
+        elif offset <= 50:
+            color = '#ffc107'
+            label = f'{offset} ns'
+        else:
+            color = '#f44336'
+            label = f'{offset} ns'
+
+        self.phc2sys_light.setStyleSheet(
+            f'background-color: {color}; border-radius: 10px;')
+        if offset is not None:
+            self.phc2sys_offset_label.setText(f'Offset: {label}')
+            self.phc2sys_state_label.setText(label)
+        else:
+            self.phc2sys_offset_label.setText('Offset: \u2014')
+            self.phc2sys_state_label.setText('\u2014')
+
+    def _phc2sys_reset(self):
+        self.is_phc2sys_running = False
+        self.phc2sys_process = None
+        self._phc2sys_offset = None
+        self.phc2sys_start_btn.setEnabled(self._can_start_phc2sys())
+        self.phc2sys_stop_btn.setEnabled(False)
+        self._update_phc2sys_status()
+
+    def _phc2sys_finished(self, exit_code, exit_status):
+        self._phc2sys_reset()
+        if exit_code == 0:
+            self.phc2sys_terminal.append("phc2sys completed.")
+        else:
+            self.phc2sys_terminal.append(f"phc2sys exited with code: {exit_code}")
+
+    def _phc2sys_check_sync(self):
+        """Enable/disable phc2sys start button based on PTP sync state."""
+        can_start = self._can_start_phc2sys()
+        if not self.is_phc2sys_running:
+            self.phc2sys_start_btn.setEnabled(can_start)
+            if not can_start:
+                self.phc2sys_start_btn.setToolTip(
+                    'PTP must be running and in SLAVE/MASTER state first.')
+            else:
+                self.phc2sys_start_btn.setToolTip('')
+
+    # ── PTP4L ────────────────────────────────────────────────────
 
     def open_ptp4l_config(self):
         ptp4l_path = "/etc/linuxptp/ptp4l.conf"
