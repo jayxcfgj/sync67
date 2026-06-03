@@ -54,6 +54,7 @@ CONFIG_PARAMS: list[ParamDef] = [
              tooltip='Alternative clock source.\n'
                      'Leave empty = automatic via interface/device.\n'
                      '"tai" = CLOCK_TAI (syncable via NTP).\n'
+                     '"realtime" = CLOCK_REALTIME (use with phc2sys).\n'
                      'Or enter a custom clock ID (e.g. "42").',
              section='PTP Clock'),
     ParamDef('clock.name', 'context.objects',
