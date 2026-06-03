@@ -113,10 +113,8 @@ class PTPTab(QWidget):
         phc2sys_group = QGroupBox("phc2sys")
         phc2sys_inner = QVBoxLayout(phc2sys_group)
 
-        # Offset label at the top (matching Interface position)
-        self.phc2sys_offset_label = QLabel("Offset: \u2014")
-        self.phc2sys_offset_label.setStyleSheet("color: #cccccc; font-size: 12px; padding: 4px 0;")
-        phc2sys_inner.addWidget(self.phc2sys_offset_label)
+        # Placeholder spacer so config button aligns with PTP4L column
+        phc2sys_inner.addSpacing(28)
 
         self.phc2sys_config_btn = QPushButton("phc2sys Config...")
         self.phc2sys_config_btn.clicked.connect(self.open_phc2sys_config)
@@ -621,10 +619,8 @@ class PTPTab(QWidget):
         self.phc2sys_light.setStyleSheet(
             f'background-color: {color}; border-radius: 10px;')
         if offset is not None:
-            self.phc2sys_offset_label.setText(f'Offset: {label}')
             self.phc2sys_state_label.setText(label)
         else:
-            self.phc2sys_offset_label.setText('Offset: \u2014')
             self.phc2sys_state_label.setText('\u2014')
 
     def _phc2sys_reset(self):
