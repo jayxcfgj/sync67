@@ -66,6 +66,8 @@ class PTPTab(QWidget):
         self.ptp4l_edit_btn.clicked.connect(self.open_ptp4l_editor)
         ptp4l_inner.addWidget(self.ptp4l_edit_btn)
 
+        ptp4l_inner.addStretch()
+
         ptp4l_btn_row = QHBoxLayout()
         self.start_btn = QPushButton("START PTP")
         self.start_btn.setStyleSheet("""
@@ -100,6 +102,7 @@ class PTPTab(QWidget):
         ptp4l_btn_row.addWidget(self.status_light)
         self.state_label = QLabel("")
         self.state_label.setStyleSheet("color: #cccccc; font-size: 11px; padding-left: 2px;")
+        self.state_label.setMinimumWidth(80)
         ptp4l_btn_row.addWidget(self.state_label)
         ptp4l_btn_row.addStretch()
         ptp4l_inner.addLayout(ptp4l_btn_row)
@@ -109,6 +112,17 @@ class PTPTab(QWidget):
         # ── Right: phc2sys ───────────────────────────────────────
         phc2sys_group = QGroupBox("phc2sys")
         phc2sys_inner = QVBoxLayout(phc2sys_group)
+
+        # Offset label at the top (matching Interface position)
+        self.phc2sys_offset_label = QLabel("Offset: \u2014")
+        self.phc2sys_offset_label.setStyleSheet("color: #cccccc; font-size: 12px; padding: 4px 0;")
+        phc2sys_inner.addWidget(self.phc2sys_offset_label)
+
+        self.phc2sys_config_btn = QPushButton("phc2sys Config...")
+        self.phc2sys_config_btn.clicked.connect(self.open_phc2sys_config)
+        phc2sys_inner.addWidget(self.phc2sys_config_btn)
+
+        phc2sys_inner.addStretch()
 
         phc2sys_btn_row = QHBoxLayout()
         self.phc2sys_start_btn = QPushButton("Start phc2sys")
@@ -145,17 +159,10 @@ class PTPTab(QWidget):
         phc2sys_btn_row.addWidget(self.phc2sys_light)
         self.phc2sys_state_label = QLabel("\u2014")
         self.phc2sys_state_label.setStyleSheet("color: #cccccc; font-size: 11px; padding-left: 2px;")
+        self.phc2sys_state_label.setMinimumWidth(80)
         phc2sys_btn_row.addWidget(self.phc2sys_state_label)
         phc2sys_btn_row.addStretch()
         phc2sys_inner.addLayout(phc2sys_btn_row)
-
-        self.phc2sys_offset_label = QLabel("Offset: \u2014")
-        self.phc2sys_offset_label.setStyleSheet("color: #cccccc; font-size: 12px; padding: 2px 0;")
-        phc2sys_inner.addWidget(self.phc2sys_offset_label)
-
-        self.phc2sys_config_btn = QPushButton("phc2sys Config...")
-        self.phc2sys_config_btn.clicked.connect(self.open_phc2sys_config)
-        phc2sys_inner.addWidget(self.phc2sys_config_btn)
 
         top_row.addWidget(phc2sys_group)
         layout.addLayout(top_row)
