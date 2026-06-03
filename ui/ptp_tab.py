@@ -222,7 +222,13 @@ class PTPTab(QWidget):
 
             commands = []
             if phc_reset:
-                commands.append("sudo phc_ctl /dev/ptp0 set")
+                phc_dev = self._get_phc_device(iface)
+                if phc_dev:
+                    commands.append(f"sudo phc_ctl {phc_dev} set")
+                else:
+                    self.terminal_output.insertPlainText(
+                        f"⚠ Could not determine PHC device for {iface}, skipping phc_ctl\n"
+                    )
             if wol_d:
                 commands.append(f"sudo ethtool -s {iface} wol d")
             if gro_off:
@@ -250,6 +256,24 @@ class PTPTab(QWidget):
         except Exception as e:
             self.terminal_output.append(f"Error: {str(e)}")
             self.terminal_output.append(traceback.format_exc())
+
+    def _get_phc_device(self, iface):
+        """Determine the PHC device for a network interface via ethtool -T.
+
+        Returns e.g. '/dev/ptp1' or None if no PHC is associated /
+        ethtool not available.
+        """
+        try:
+            proc = QProcess()
+            proc.start('ethtool', ['-T', iface])
+            proc.waitForFinished(5000)
+            out = bytes(proc.readAllStandardOutput()).decode('utf-8', errors='replace')
+            m = re.search(r'PTP Hardware Clock:\s*(\d+)', out)
+            if m:
+                return f'/dev/ptp{m.group(1)}'
+        except Exception:
+            pass
+        return None
 
     def run_commands(self, commands, iface):
         self.command_queue = commands.copy()
