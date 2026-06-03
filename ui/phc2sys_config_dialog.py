@@ -131,7 +131,6 @@ class Phc2sysConfigDialog(QDialog):
                         'Default: 5.0 Hz (AES67 recommendation).')
         self._add_row(form, 'Update rate (-R):', self._widgets['update_rate'][0])
 
-        form.addStretch()
         self.tabs.addTab(self._make_scroll(form), 'Quick')
 
     # ── Servo Tab ────────────────────────────────────────────────
@@ -207,7 +206,6 @@ class Phc2sysConfigDialog(QDialog):
                         'Only relevant for ntpshm servo type.')
         self._add_row(form, 'SHM segment (-M):', self._widgets['shm_segment'][0])
 
-        form.addStretch()
         self.tabs.addTab(self._make_scroll(form), 'Servo')
 
     # ── Advanced Tab ─────────────────────────────────────────────
@@ -266,7 +264,6 @@ class Phc2sysConfigDialog(QDialog):
                         'Must match phc2sys.conf format.')
         self._add_row(form, 'Config file (-f):', self._widgets['config_file'][0])
 
-        form.addStretch()
         self.tabs.addTab(self._make_scroll(form), 'Advanced')
 
     # ── Manual Tab ───────────────────────────────────────────────
@@ -308,7 +305,6 @@ class Phc2sysConfigDialog(QDialog):
                         'Manual: e.g. 37000000 (37s UTC-TAI).')
         self._add_row(form, 'Time offset (-O):', self._widgets['time_offset'][0])
 
-        form.addStretch()
         self.tabs.addTab(self._make_scroll(form), 'Manual')
 
     # ── Widget helpers ───────────────────────────────────────────
