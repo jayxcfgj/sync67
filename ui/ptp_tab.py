@@ -138,7 +138,7 @@ class PTPTab(QWidget):
         self.phc2sys_start_btn.clicked.connect(self.start_phc2sys)
         phc2sys_btn_row.addWidget(self.phc2sys_start_btn)
 
-        self.phc2sys_stop_btn = QPushButton("Stop")
+        self.phc2sys_stop_btn = QPushButton("Stop phc2sys")
         self.phc2sys_stop_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f44336; color: white;
