@@ -1,23 +1,26 @@
-"""phc2sys Config Dialog – 4 tabs for all command-line options."""
+"""phc2sys Config Dialog – 4 tabs, Persist via /etc/linuxptp/phc2sys.conf + QSettings."""
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
     QCheckBox, QComboBox, QPushButton,
-    QWidget, QScrollArea, QFormLayout
+    QWidget, QScrollArea, QMessageBox
 )
 from PyQt6.QtCore import Qt, QSettings
 
 import os
 
+from core.phc2sys_config import Phc2sysConfig, CONFIG_PATH
+from core.phc2sys_config_meta import BUILTIN_DEFAULTS
 
-_IFACE_CACHE = None
+
+_PHC_CACHE = None
 
 
 def _load_phc_devices():
-    global _IFACE_CACHE
-    if _IFACE_CACHE is not None:
-        return _IFACE_CACHE
+    global _PHC_CACHE
+    if _PHC_CACHE is not None:
+        return _PHC_CACHE
     devices = []
     try:
         for entry in os.listdir('/sys/class/ptp/'):
@@ -25,45 +28,123 @@ def _load_phc_devices():
                 devices.append(f'/dev/{entry}')
     except Exception:
         pass
-    _IFACE_CACHE = sorted(devices)
-    return _IFACE_CACHE
-
-
-_DEFAULT_TOOLTIP = 'Default: {}'
-_DEFAULT = object()
-
-
-def _lbl(text, default=_DEFAULT, tooltip=''):
-    parts = [text]
-    if default is not _DEFAULT:
-        parts.append(f'  ({_DEFAULT_TOOLTIP.format(default)})')
-    full = '\n'.join(parts)
-    if tooltip:
-        full += f'\n{tooltip}'
-    return full
+    _PHC_CACHE = sorted(devices)
+    return _PHC_CACHE
 
 
 class Phc2sysConfigDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, config: Phc2sysConfig, parent=None):
         super().__init__(parent)
+        self.config = config
         self.setWindowTitle('phc2sys Configuration')
-        self.setMinimumSize(400, 300)
-        self.resize(550, 500)
+        self.setMinimumSize(380, 250)
+        self.resize(480, 380)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
-        self._settings = QSettings('sync67', 'phc2sys_settings')
+        self._qset = QSettings('sync67', 'phc2sys_settings')
         self._widgets = {}
         self._init_ui()
 
-    def _add_row(self, layout, label, widget, default_label_text=''):
-        row = QHBoxLayout()
-        row.addWidget(QLabel(label))
-        row.addWidget(widget)
-        if default_label_text:
-            dl = QLabel(default_label_text)
-            dl.setStyleSheet('color: gray; font-size: 10px;')
-            row.addWidget(dl)
-        row.addStretch()
-        layout.addRow(row)
+    # ── Helpers ──────────────────────────────────────────────────
+
+    def _default_text(self, default):
+        if isinstance(default, bool):
+            return 'Default: checked' if default else 'Default: unchecked'
+        return f'Default: {default}' if default != '' else 'Default: (empty)'
+
+    def _config_default(self, key):
+        return BUILTIN_DEFAULTS.get(key, 0)
+
+    def _make_scroll(self, layout):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        content.setMinimumSize(0, 0)
+        content.setLayout(layout)
+        scroll.setWidget(content)
+        return scroll
+
+    def _add_row(self, layout, label_text, widget, default):
+        container = QWidget()
+        cl = QVBoxLayout(container)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(2)
+        cl.addWidget(QLabel(label_text))
+        cl.addWidget(widget)
+        dl = QLabel(self._default_text(default))
+        dl.setStyleSheet('color: gray; font-size: 10px;')
+        cl.addWidget(dl)
+        layout.addWidget(container)
+
+    def _reg(self, key, widget, default, label='', tooltip='',
+             choices=None, minv=None, maxv=None, step=None):
+        widget.setToolTip(tooltip)
+        if isinstance(widget, QDoubleSpinBox):
+            if minv is not None: widget.setMinimum(minv)
+            if maxv is not None: widget.setMaximum(maxv)
+            if step is not None: widget.setSingleStep(step)
+            widget.setDecimals(1)
+        elif isinstance(widget, QSpinBox):
+            if minv is not None: widget.setMinimum(minv)
+            if maxv is not None: widget.setMaximum(maxv)
+            if step is not None: widget.setSingleStep(step)
+        elif isinstance(widget, QComboBox) and choices:
+            widget.clear()
+            widget.addItems(choices)
+        self._widgets[key] = (widget, default)
+
+    def _widget_value(self, key):
+        w, _ = self._widgets.get(key, (None, None))
+        if w is None:
+            return None
+        if isinstance(w, QCheckBox):
+            return w.isChecked()
+        if isinstance(w, (QSpinBox, QDoubleSpinBox)):
+            return w.value()
+        if isinstance(w, QComboBox):
+            return w.currentText()
+        if isinstance(w, QLineEdit):
+            return w.text()
+        return None
+
+    # ── Config / QSettings helpers ───────────────────────────────
+
+    def _load_widget(self, key, cfg_key=None, store='config'):
+        w, default = self._widgets.get(key, (None, None))
+        if w is None:
+            return
+        if store == 'config':
+            val = self.config.get(cfg_key or key)
+            if val is None:
+                val = self._config_default(cfg_key or key)
+        else:
+            val = self._qset.value(key, default)
+        self._set_widget_value(w, val)
+
+    def _save_widget(self, key, cfg_key=None, store='config'):
+        val = self._widget_value(key)
+        if store == 'config':
+            self.config.set(cfg_key or key, val)
+        else:
+            self._qset.setValue(key, val)
+
+    @staticmethod
+    def _set_widget_value(w, val):
+        if isinstance(w, QCheckBox):
+            w.setChecked(bool(val) if not isinstance(val, bool) else val)
+        elif isinstance(w, QSpinBox):
+            w.setValue(int(val))
+        elif isinstance(w, QDoubleSpinBox):
+            w.setValue(float(val))
+        elif isinstance(w, QComboBox):
+            idx = w.findText(str(val))
+            if idx >= 0:
+                w.setCurrentIndex(idx)
+            elif isinstance(val, int) and val < w.count():
+                w.setCurrentIndex(val)
+        elif isinstance(w, QLineEdit):
+            w.setText(str(val) if val else '')
+
+    # ── UI ───────────────────────────────────────────────────────
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -75,6 +156,9 @@ class Phc2sysConfigDialog(QDialog):
         layout.addWidget(self.tabs)
 
         btn_layout = QHBoxLayout()
+        reset_btn = QPushButton('Reset to Defaults')
+        reset_btn.clicked.connect(self._on_reset)
+        btn_layout.addWidget(reset_btn)
         btn_layout.addStretch()
         save_btn = QPushButton('Save')
         save_btn.clicked.connect(self._on_save)
@@ -84,380 +168,330 @@ class Phc2sysConfigDialog(QDialog):
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
 
-        self._load_settings()
-
-    def _make_scroll(self, form):
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        content = QWidget()
-        content.setMinimumSize(0, 0)
-        content.setLayout(form)
-        scroll.setWidget(content)
-        return scroll
-
-    # ── Quick Tab ────────────────────────────────────────────────
+    # ── Tabs ─────────────────────────────────────────────────────
 
     def _create_quick_tab(self):
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        lo = QVBoxLayout()
+        lo.setSpacing(2)
 
-        self._w('auto_mode', QCheckBox(), True,
-                label='Auto mode (-a)',
-                tooltip='Automatically read clocks from running ptp4l\n'
-                        'and follow port state changes. Recommended.\n'
-                        'When OFF, manual source/sink must be configured\n'
-                        'in the Manual tab.')
-        self._add_row(form, 'Auto mode (-a):', self._widgets['auto_mode'][0])
+        self._reg('auto_mode', QCheckBox(), True,
+                  label='Auto mode (-a)',
+                  tooltip='Automatically read clocks from running ptp4l\n'
+                          'and follow port state changes.\n'
+                          'When OFF, manual source/sink must be configured.')
+        self._load_widget('auto_mode', store='qset')
+        self._add_row(lo, 'Auto mode (-a)', self._widgets['auto_mode'][0], True)
 
-        self._w('sync_realtime', QComboBox(), 1,
-                label='Sync system clock (-r)',
-                choices=['off', 'single (-r)', 'double (-rr)'],
-                tooltip='-r: synchronize system (realtime) clock to PHC.\n'
-                        '-rr: also consider system clock as time source\n'
-                        '      (for grandmaster setups).')
-        self._add_row(form, 'Sync system clock:', self._widgets['sync_realtime'][0])
+        self._reg('sync_realtime', QComboBox(), 'single (-r)',
+                  choices=['off', 'single (-r)', 'double (-rr)'],
+                  tooltip='-r: synchronize system clock to PHC.\n'
+                          '-rr: also consider system clock as time source.')
+        self._load_widget('sync_realtime', store='qset')
+        self._add_row(lo, 'Sync system clock', self._widgets['sync_realtime'][0], 'single (-r)')
 
-        self._w('wait_ptp4l', QCheckBox(), True,
-                label='Wait for ptp4l (-w)',
-                tooltip='Wait until ptp4l is synchronized before starting.\n'
-                        'Auto-learns UTC offset from ptp4l.')
-        self._add_row(form, 'Wait for ptp4l (-w):', self._widgets['wait_ptp4l'][0])
+        self._reg('wait_ptp4l', QCheckBox(), True,
+                  label='Wait for ptp4l (-w)',
+                  tooltip='Wait until ptp4l is synchronized.\n'
+                          'Auto-learns UTC offset from ptp4l.\n'
+                          'Only in manual mode.')
+        self._load_widget('wait_ptp4l', store='qset')
+        self._add_row(lo, 'Wait for ptp4l (-w)', self._widgets['wait_ptp4l'][0], True)
 
-        self._w('update_rate', QDoubleSpinBox(), 5.0,
-                label='Update rate (-R Hz)',
-                minv=0.1, maxv=100.0, step=0.5,
-                tooltip='How many times per second the clock is updated.\n'
-                        'Higher = smoother sync, more CPU.\n'
-                        'Default: 5.0 Hz (AES67 recommendation).')
-        self._add_row(form, 'Update rate (-R):', self._widgets['update_rate'][0])
+        self._reg('update_interval', QDoubleSpinBox(), 1.0,
+                  label='Update interval (seconds)',
+                  minv=0.01, maxv=10.0, step=0.1,
+                  tooltip='Time between sink updates.\n'
+                          '1.0 s = 1 Hz (default).\n'
+                          '0.2 s = 5 Hz (faster).')
+        # Convert stored update_interval (seconds) from config
+        val = self.config.get('update_interval')
+        if val is None:
+            val = self._config_default('update_interval')
+        self._set_widget_value(self._widgets['update_interval'][0], val)
+        self._add_row(lo, 'Update interval (s)', self._widgets['update_interval'][0], 1.0)
 
-        self.tabs.addTab(self._make_scroll(form), 'Quick')
-
-    # ── Servo Tab ────────────────────────────────────────────────
+        lo.addStretch()
+        self.tabs.addTab(self._make_scroll(lo), 'Quick')
 
     def _create_servo_tab(self):
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        lo = QVBoxLayout()
+        lo.setSpacing(2)
 
-        self._w('servo_type', QComboBox(), 0,
-                label='Clock servo (-E)',
-                choices=['pi', 'linreg'],
-                tooltip='pi = Proportional-Integral controller (stable).\n'
-                        'linreg = linear regression (better for large drift).')
-        self._add_row(form, 'Servo type (-E):', self._widgets['servo_type'][0])
+        self._reg('clock_servo', QComboBox(), 'pi',
+                  choices=['pi', 'linreg', 'ntpshm', 'nullf', 'refclock_sock'],
+                  tooltip='Clock servo algorithm.\n'
+                          'pi = PI controller (default).\n'
+                          'linreg = linear regression.')
+        self._load_widget('clock_servo', store='config')
+        self._add_row(lo, 'Clock servo', self._widgets['clock_servo'][0], 'pi')
 
-        self._w('pi_proportional', QDoubleSpinBox(), 0.7,
-                label='PI proportional (-P)',
-                minv=0.01, maxv=10.0, step=0.1,
-                tooltip='Proportional gain. Higher = faster reaction.\n'
-                        'Lower (0.5) for stable PCIe NICs.')
-        self._add_row(form, 'PI proportional (-P):', self._widgets['pi_proportional'][0])
+        self._reg('pi_proportional_const', QDoubleSpinBox(), 0.7,
+                  minv=0.01, maxv=10.0, step=0.1,
+                  tooltip='Proportional gain (-P).')
+        self._load_widget('pi_proportional_const', store='config')
+        self._add_row(lo, 'PI proportional const', self._widgets['pi_proportional_const'][0], 0.7)
 
-        self._w('pi_integral', QDoubleSpinBox(), 0.3,
-                label='PI integral (-I)',
-                minv=0.01, maxv=10.0, step=0.1,
-                tooltip='Integral gain. Higher = faster steady-state correction.\n'
-                        'Lower (0.1) for noisy PHCs.')
-        self._add_row(form, 'PI integral (-I):', self._widgets['pi_integral'][0])
+        self._reg('pi_integral_const', QDoubleSpinBox(), 0.3,
+                  minv=0.01, maxv=10.0, step=0.1,
+                  tooltip='Integral gain (-I).')
+        self._load_widget('pi_integral_const', store='config')
+        self._add_row(lo, 'PI integral const', self._widgets['pi_integral_const'][0], 0.3)
 
-        self._w('step_threshold', QSpinBox(), 0,
-                label='Step threshold (-S µs)',
-                minv=0, maxv=1000000, step=100,
-                tooltip='Maximum offset correctable by frequency adjustment.\n'
-                        'Offsets above this cause a time step.\n'
-                        '0 = no stepping after startup. Default: 0 (disabled).')
-        self._add_row(form, 'Step threshold (-S):', self._widgets['step_threshold'][0])
+        self._reg('step_threshold', QDoubleSpinBox(), 0.0,
+                  minv=0.0, maxv=1.0, step=0.01,
+                  tooltip='Step threshold in seconds (-S).\n'
+                          '0.0 = no stepping after startup.')
+        self._load_widget('step_threshold', store='config')
+        self._add_row(lo, 'Step threshold (s)', self._widgets['step_threshold'][0], 0.0)
 
-        self._w('first_step', QSpinBox(), 20,
-                label='First step threshold (-F µs)',
-                minv=0, maxv=1000000, step=10,
-                tooltip='Max offset corrected by frequency on first update.\n'
-                        'Allows quick lock at startup. Raise (1000 µs)\n'
-                        'for cold-start USB PHCs. Default: 20 µs.')
-        self._add_row(form, 'First step (-F):', self._widgets['first_step'][0])
+        self._reg('first_step_threshold', QDoubleSpinBox(), 0.00002,
+                  minv=0.0, maxv=1.0, step=0.00001,
+                  tooltip='First step threshold in seconds (-F).\n'
+                          'Default: 0.00002 (20 µs).')
+        self._load_widget('first_step_threshold', store='config')
+        self._add_row(lo, 'First step threshold (s)', self._widgets['first_step_threshold'][0], 0.00002)
 
-        self._w('sanity_limit', QSpinBox(), 200000000,
-                label='Sanity freq limit (-L ppb)',
-                minv=0, maxv=999999999, step=1000000,
-                tooltip='Maximum allowed frequency offset in ppb.\n'
-                        'Triggers servo reset if exceeded.\n'
-                        '0 = disabled. Default: 200000000 (20%).')
-        self._add_row(form, 'Sanity limit (-L):', self._widgets['sanity_limit'][0])
+        self._reg('sanity_freq_limit', QSpinBox(), 200000000,
+                  minv=0, maxv=999999999, step=1000000,
+                  tooltip='Sanity frequency limit in ppb (-L).')
+        self._load_widget('sanity_freq_limit', store='config')
+        self._add_row(lo, 'Sanity freq limit (ppb)', self._widgets['sanity_freq_limit'][0], 200000000)
 
-        self._w('readings_per_update', QSpinBox(), 5,
-                label='Readings per update (-N)',
-                minv=1, maxv=100, step=1,
-                tooltip='Number of PHC readings per update.\n'
-                        'Only the fastest is used. Increase (10-15)\n'
-                        'for noisy USB NICs. Default: 5.')
-        self._add_row(form, 'Readings (-N):', self._widgets['readings_per_update'][0])
+        self._reg('num_readings', QSpinBox(), 5,
+                  minv=1, maxv=100, step=1,
+                  tooltip='Number of PHC readings per update (-N).')
+        self._load_widget('num_readings', store='config')
+        self._add_row(lo, 'Num readings', self._widgets['num_readings'][0], 5)
 
-        self._w('summary_updates', QSpinBox(), 0,
-                label='Summary updates (-u)',
-                minv=0, maxv=1000, step=1,
-                tooltip='Number of clock updates in summary stats.\n'
-                        '0 = disabled (prints individual samples).')
-        self._add_row(form, 'Summary updates (-u):', self._widgets['summary_updates'][0])
+        # summary_updates and ntpshm_segment are CLI-only/config
+        self._reg('summary_updates', QSpinBox(), 0,
+                  minv=0, maxv=1000, step=1,
+                  tooltip='Summary updates (-u). 0 = disabled.')
+        self._load_widget('summary_updates', store='qset')
+        self._add_row(lo, 'Summary updates (-u)', self._widgets['summary_updates'][0], 0)
 
-        self._w('shm_segment', QSpinBox(), 0,
-                label='SHM segment (-M)',
-                minv=0, maxv=255, step=1,
-                tooltip='NTP SHM segment number.\n'
-                        'Only relevant for ntpshm servo type.')
-        self._add_row(form, 'SHM segment (-M):', self._widgets['shm_segment'][0])
+        self._reg('ntpshm_segment', QSpinBox(), 0,
+                  minv=0, maxv=255, step=1,
+                  tooltip='NTP SHM segment (-M).')
+        self._load_widget('ntpshm_segment', store='config')
+        self._add_row(lo, 'SHM segment', self._widgets['ntpshm_segment'][0], 0)
 
-        self.tabs.addTab(self._make_scroll(form), 'Servo')
-
-    # ── Advanced Tab ─────────────────────────────────────────────
+        lo.addStretch()
+        self.tabs.addTab(self._make_scroll(lo), 'Servo')
 
     def _create_advanced_tab(self):
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        lo = QVBoxLayout()
+        lo.setSpacing(2)
 
-        self._w('uds_address', QLineEdit(), '/var/run/ptp4l',
-                label='UDS address (-z)',
-                tooltip='UNIX domain socket for ptp4l communication.\n'
-                        'Must match ptp4l uds_address/ptp4l.conf.')
-        self._add_row(form, 'UDS address (-z):', self._widgets['uds_address'][0])
+        self._reg('uds_address', QLineEdit(), '/var/run/ptp4l',
+                  tooltip='UDS address (-z). Must match ptp4l.')
+        self._load_widget('uds_address', store='config')
+        self._add_row(lo, 'UDS address', self._widgets['uds_address'][0], '/var/run/ptp4l')
 
-        self._w('domain_number', QSpinBox(), 0,
-                label='Domain number (-n)',
-                minv=0, maxv=255, step=1,
-                tooltip='PTP domain number. Must match ptp4l.')
-        self._add_row(form, 'Domain (-n):', self._widgets['domain_number'][0])
+        self._reg('domainNumber', QSpinBox(), 0,
+                  minv=0, maxv=255, step=1,
+                  tooltip='PTP domain number (-n).')
+        self._load_widget('domainNumber', store='config')
+        self._add_row(lo, 'Domain number', self._widgets['domainNumber'][0], 0)
 
-        self._w('logging_level', QSpinBox(), 6,
-                label='Logging level (-l)',
-                minv=0, maxv=7, step=1,
-                tooltip='0=emerg, 1=alert, 2=crit, 3=err,\n'
-                        '4=warning, 5=notice, 6=info, 7=debug.')
-        self._add_row(form, 'Log level (-l):', self._widgets['logging_level'][0])
+        self._reg('logging_level', QSpinBox(), 6,
+                  minv=0, maxv=7, step=1,
+                  tooltip='Logging level (-l). 6 = info.')
+        self._load_widget('logging_level', store='config')
+        self._add_row(lo, 'Logging level', self._widgets['logging_level'][0], 6)
 
-        self._w('message_tag', QLineEdit(), '',
-                label='Message tag (-t)',
-                tooltip='String prepended to all log messages.\n'
-                        'Helps identify phc2sys output alongside ptp4l.')
-        self._add_row(form, 'Tag (-t):', self._widgets['message_tag'][0])
+        self._reg('message_tag', QLineEdit(), '',
+                  tooltip='Message tag (-t). Prepended to log output.')
+        self._load_widget('message_tag', store='config')
+        self._add_row(lo, 'Message tag', self._widgets['message_tag'][0], '')
 
-        self._w('leap_servo', QCheckBox(), False,
-                label='Leap servo (-x)',
-                tooltip='Apply leap seconds by servo instead of kernel.\n'
-                        'Avoids a sudden 1s time step during leap events.')
-        self._add_row(form, 'Leap servo (-x):', self._widgets['leap_servo'][0])
+        # kernel_leap: inverted from -x checkbox
+        self._reg('kernel_leap', QCheckBox(), True,
+                  label='Kernel leap handling',
+                  tooltip='Let kernel apply leap seconds.\n'
+                          'Uncheck (= -x) to let servo correct slowly.')
+        kl = self.config.get('kernel_leap')
+        if kl is None:
+            kl = self._config_default('kernel_leap')
+        self._set_widget_value(self._widgets['kernel_leap'][0], kl)
+        self._add_row(lo, 'Kernel leap handling', self._widgets['kernel_leap'][0], True)
 
-        self._w('quiet_syslog', QCheckBox(), False,
-                label='Quiet syslog (-q)',
-                tooltip='Do not print messages to syslog.\n'
-                        'Only stdout (with -m).')
-        self._add_row(form, 'Quiet syslog (-q):', self._widgets['quiet_syslog'][0])
+        # use_syslog: inverted from -q checkbox
+        self._reg('use_syslog', QCheckBox(), True,
+                  label='Use syslog',
+                  tooltip='Print messages to system log.\n'
+                          'Uncheck (= -q) to suppress syslog.')
+        self._load_widget('use_syslog', store='config')
+        self._add_row(lo, 'Use syslog', self._widgets['use_syslog'][0], True)
 
-        self._w('print_stdout', QCheckBox(), True,
-                label='Print stdout (-m)',
-                tooltip='Print messages to stdout.\n'
-                        'Required for terminal display in the UI.')
-        self._add_row(form, 'Print stdout (-m):', self._widgets['print_stdout'][0])
+        # verbose = -m checkbox
+        self._reg('verbose', QCheckBox(), False,
+                  label='Verbose (stdout)',
+                  tooltip='Print messages to stdout (= -m).\n'
+                          'Required for terminal display.')
+        self._load_widget('verbose', store='config')
+        self._add_row(lo, 'Verbose (-m)', self._widgets['verbose'][0], False)
 
-        self._w('config_file', QLineEdit(), '',
-                label='Config file (-f)',
-                tooltip='Path to external config file. If set, all\n'
-                        'other CLI parameters are ignored.\n'
-                        'Must match phc2sys.conf format.')
-        self._add_row(form, 'Config file (-f):', self._widgets['config_file'][0])
+        self._reg('free_running', QCheckBox(), False,
+                  label='Free running',
+                  tooltip="Don't adjust the sink clock.\n"
+                          'For testing / monitoring only.')
+        self._load_widget('free_running', store='config')
+        self._add_row(lo, 'Free running', self._widgets['free_running'][0], False)
 
-        self.tabs.addTab(self._make_scroll(form), 'Advanced')
+        self._reg('transportSpecific', QSpinBox(), 0,
+                  minv=0, maxv=255, step=1,
+                  tooltip='Transport specific field.')
+        self._load_widget('transportSpecific', store='config')
+        self._add_row(lo, 'Transport specific', self._widgets['transportSpecific'][0], 0)
 
-    # ── Manual Tab ───────────────────────────────────────────────
+        self._reg('refclock_sock_address', QLineEdit(), '/var/run/refclock.ptp.sock',
+                  tooltip='UNIX socket for refclock_sock servo.')
+        self._load_widget('refclock_sock_address', store='config')
+        self._add_row(lo, 'Refclock socket', self._widgets['refclock_sock_address'][0],
+                      '/var/run/refclock.ptp.sock')
+
+        lo.addStretch()
+        self.tabs.addTab(self._make_scroll(lo), 'Advanced')
 
     def _create_manual_tab(self):
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        lo = QVBoxLayout()
+        lo.setSpacing(2)
 
         phc_devices = _load_phc_devices()
-        all_clock_sources = ['CLOCK_REALTIME'] + phc_devices
+        src_choices = phc_devices or ['/dev/ptp0']
 
-        self._w('source_device', QComboBox(), 0,
-                label='Source device (-s)',
-                choices=phc_devices or ['/dev/ptp0'],
-                tooltip='Source clock device. Used when auto mode (-a) is OFF.\n'
-                        'The clock that provides the reference time.')
-        self._add_row(form, 'Source device (-s):', self._widgets['source_device'][0])
+        self._reg('source_device', QComboBox(), src_choices[0],
+                  choices=src_choices,
+                  tooltip='Source clock device (-s).\n'
+                          'Used when auto mode is OFF.')
+        self._load_widget('source_device', store='qset')
+        self._add_row(lo, 'Source device (-s)', self._widgets['source_device'][0], src_choices[0])
 
-        self._w('sink_device', QComboBox(), 0,
-                label='Sink device (-c)',
-                choices=all_clock_sources,
-                tooltip='Sink clock device. Used when auto mode (-a) is OFF.\n'
-                        'The clock that receives the reference time.\n'
-                        'Default: CLOCK_REALTIME (system clock).')
-        self._add_row(form, 'Sink device (-c):', self._widgets['sink_device'][0])
+        all_sinks = ['CLOCK_REALTIME'] + phc_devices
+        self._reg('sink_device', QComboBox(), 'CLOCK_REALTIME',
+                  choices=all_sinks,
+                  tooltip='Sink clock device (-c).\n'
+                          'Default: CLOCK_REALTIME (system clock).')
+        self._load_widget('sink_device', store='qset')
+        self._add_row(lo, 'Sink device (-c)', self._widgets['sink_device'][0], 'CLOCK_REALTIME')
 
-        self._w('pps_device', QLineEdit(), '',
-                label='PPS device (-d)',
-                tooltip='Pulse-per-second device (e.g. /dev/pps0).\n'
-                        'Alternative to direct time reads.\n'
-                        'Leave empty unless using PPS.')
-        self._add_row(form, 'PPS device (-d):', self._widgets['pps_device'][0])
+        self._reg('pps_device', QLineEdit(), '',
+                  tooltip='PPS device (-d). Leave empty unless using PPS.')
+        self._load_widget('pps_device', store='qset')
+        self._add_row(lo, 'PPS device (-d)', self._widgets['pps_device'][0], '')
 
-        self._w('time_offset', QSpinBox(), 0,
-                label='Time offset (-O µs)',
-                minv=-1000000, maxv=1000000, step=1,
-                tooltip='Sink-source time offset in µs.\n'
-                        'Auto-learned from ptp4l when -w is used.\n'
-                        'Manual: e.g. 37000000 (37s UTC-TAI).')
-        self._add_row(form, 'Time offset (-O):', self._widgets['time_offset'][0])
+        # leap_seconds from config (was time_offset in µs, now seconds)
+        self._reg('leap_seconds', QSpinBox(), 0,
+                  minv=-1000, maxv=1000, step=1,
+                  tooltip='UTC-TAI offset in seconds.\n'
+                          'Config file equivalent of -O.\n'
+                          'Currently 37. Set to 0 for auto-learn.')
+        self._load_widget('leap_seconds', store='config')
+        self._add_row(lo, 'Leap seconds (-O)', self._widgets['leap_seconds'][0], 0)
 
-        self.tabs.addTab(self._make_scroll(form), 'Manual')
+        lo.addStretch()
+        self.tabs.addTab(self._make_scroll(lo), 'Manual')
 
-    # ── Widget helpers ───────────────────────────────────────────
-
-    def _w(self, key, widget, default, label='', tooltip='',
-           choices=None, minv=None, maxv=None, step=None):
-        widget.setToolTip(tooltip)
-        if isinstance(widget, QDoubleSpinBox):
-            if minv is not None:
-                widget.setMinimum(minv)
-            if maxv is not None:
-                widget.setMaximum(maxv)
-            if step is not None:
-                widget.setSingleStep(step)
-            widget.setDecimals(1)
-        elif isinstance(widget, QSpinBox):
-            if minv is not None:
-                widget.setMinimum(minv)
-            if maxv is not None:
-                widget.setMaximum(maxv)
-            if step is not None:
-                widget.setSingleStep(step)
-        elif isinstance(widget, QComboBox) and choices:
-            widget.clear()
-            widget.addItems(choices)
-        self._widgets[key] = (widget, default)
-
-    def _load_settings(self):
-        for key, (widget, default) in self._widgets.items():
-            val = self._settings.value(key, default)
-            if isinstance(widget, QCheckBox):
-                widget.setChecked(bool(val) if not isinstance(val, bool) else val)
-            elif isinstance(widget, QSpinBox):
-                widget.setValue(int(val))
-            elif isinstance(widget, QDoubleSpinBox):
-                widget.setValue(float(val))
-            elif isinstance(widget, QComboBox):
-                idx = widget.findText(str(val))
-                if idx >= 0:
-                    widget.setCurrentIndex(idx)
-                elif isinstance(val, int) and val < widget.count():
-                    widget.setCurrentIndex(val)
-            elif isinstance(widget, QLineEdit):
-                widget.setText(str(val) if val else '')
-
-    def _save_settings(self):
-        for key, (widget, _) in self._widgets.items():
-            if isinstance(widget, QCheckBox):
-                self._settings.setValue(key, widget.isChecked())
-            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                self._settings.setValue(key, widget.value())
-            elif isinstance(widget, QComboBox):
-                self._settings.setValue(key, widget.currentText())
-            elif isinstance(widget, QLineEdit):
-                self._settings.setValue(key, widget.text())
+    # ── Actions ──────────────────────────────────────────────────
 
     def _on_save(self):
-        self._save_settings()
+        # Save config file params
+        # Quick tab
+        self._save_widget('update_interval', store='config')
+
+        # Servo tab
+        self._save_widget('clock_servo', store='config')
+        self._save_widget('pi_proportional_const', store='config')
+        self._save_widget('pi_integral_const', store='config')
+        self._save_widget('step_threshold', store='config')
+        self._save_widget('first_step_threshold', store='config')
+        self._save_widget('sanity_freq_limit', store='config')
+        self._save_widget('num_readings', store='config')
+        self._save_widget('ntpshm_segment', store='config')
+
+        # Advanced tab
+        self._save_widget('uds_address', store='config')
+        self._save_widget('domainNumber', store='config')
+        self._save_widget('logging_level', store='config')
+        self._save_widget('message_tag', store='config')
+        self._save_widget('kernel_leap', store='config')
+        self._save_widget('use_syslog', store='config')
+        self._save_widget('verbose', store='config')
+        self._save_widget('free_running', store='config')
+        self._save_widget('transportSpecific', store='config')
+        self._save_widget('refclock_sock_address', store='config')
+
+        # Manual tab
+        self._save_widget('leap_seconds', store='config')
+
+        # Save CLI-only flags to QSettings
+        self._save_widget('auto_mode', store='qset')
+        self._save_widget('sync_realtime', store='qset')
+        self._save_widget('wait_ptp4l', store='qset')
+        self._save_widget('summary_updates', store='qset')
+        self._save_widget('source_device', store='qset')
+        self._save_widget('sink_device', store='qset')
+        self._save_widget('pps_device', store='qset')
+
+        # Persist config file
+        self.config.save()
         self.accept()
 
+    def _on_reset(self):
+        reply = QMessageBox.warning(
+            self, 'Reset to Defaults',
+            'Reset all phc2sys parameters to their defaults?\n'
+            'This will clear the config file.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.config.reset_to_default()
+            # Reload all config widgets
+            for key, (w, default) in self._widgets.items():
+                val = self.config.get(key)
+                if val is None:
+                    val = self._config_default(key)
+                self._set_widget_value(w, val)
+            # Reset QSettings CLI flags
+            for key in ('auto_mode', 'sync_realtime', 'wait_ptp4l',
+                        'summary_updates', 'source_device', 'sink_device',
+                        'pps_device'):
+                w, default = self._widgets.get(key, (None, None))
+                if w is not None:
+                    self._set_widget_value(w, default)
+
+    # ─── Command Builder ──────────────────────────────────────
+
     def build_command(self):
-        """Build phc2sys command from current settings.
+        """Build phc2sys command: -f config + CLI-only flags."""
 
-        Returns list of argument strings or empty if config file is set.
-        """
-        cfg = self._settings.value('config_file', '', type=str)
-        if cfg:
-            return []
-
-        args = []
-        auto = self._settings.value('auto_mode', True, type=bool)
+        # Load saved CLI flags from QSettings
+        auto = self._qset.value('auto_mode', True, type=bool)
         if auto:
-            args.append('-a')
-            sync_r = self._settings.value('sync_realtime', 'single (-r)', type=str)
-            if sync_r == 'single (-r)':
-                args.append('-r')
-            elif sync_r == 'double (-rr)':
-                args.append('-rr')
+            sync_r = self._qset.value('sync_realtime', 'single (-r)', type=str)
+            if sync_r == 'double (-rr)':
+                cli_flags = ['-a', '-rr']
+            elif sync_r == 'single (-r)':
+                cli_flags = ['-a', '-r']
+            else:
+                cli_flags = ['-a']
         else:
-            if self._settings.value('wait_ptp4l', True, type=bool):
-                args.append('-w')
-            source = self._settings.value('source_device', '/dev/ptp0', type=str)
+            cli_flags = []
+            wait = self._qset.value('wait_ptp4l', True, type=bool)
+            if wait:
+                cli_flags.append('-w')
+            source = self._qset.value('source_device', '', type=str)
             if source:
-                args.extend(['-s', source])
-            sink = self._settings.value('sink_device', 'CLOCK_REALTIME', type=str)
+                cli_flags.extend(['-s', source])
+            sink = self._qset.value('sink_device', 'CLOCK_REALTIME', type=str)
             if sink:
-                args.extend(['-c', sink])
-            pps = self._settings.value('pps_device', '', type=str)
+                cli_flags.extend(['-c', sink])
+            pps = self._qset.value('pps_device', '', type=str)
             if pps:
-                args.extend(['-d', pps])
-            offset = self._settings.value('time_offset', 0, type=int)
-            if offset != 0:
-                args.extend(['-O', str(offset / 1_000_000)])
+                cli_flags.extend(['-d', pps])
 
-        rate = self._settings.value('update_rate', 5.0, type=float)
-        args.extend(['-R', str(rate)])
+        # Always print to stdout
+        cli_flags.append('-m')
 
-        servo = self._settings.value('servo_type', 'pi', type=str)
-        args.extend(['-E', servo])
-
-        pp = self._settings.value('pi_proportional', 0.7, type=float)
-        args.extend(['-P', str(pp)])
-
-        pi = self._settings.value('pi_integral', 0.3, type=float)
-        args.extend(['-I', str(pi)])
-
-        step = self._settings.value('step_threshold', 0, type=int)
-        if step > 0:
-            args.extend(['-S', str(step / 1_000_000)])
-
-        first = self._settings.value('first_step', 20, type=int)
-        if first > 0:
-            args.extend(['-F', str(first / 1_000_000)])
-
-        limit = self._settings.value('sanity_limit', 200000000, type=int)
-        if limit != 200000000:
-            args.extend(['-L', str(limit)])
-
-        n_readings = self._settings.value('readings_per_update', 5, type=int)
-        if n_readings != 5:
-            args.extend(['-N', str(n_readings)])
-
-        summary = self._settings.value('summary_updates', 0, type=int)
-        if summary > 0:
-            args.extend(['-u', str(summary)])
-
-        shm = self._settings.value('shm_segment', 0, type=int)
-        if shm != 0:
-            args.extend(['-M', str(shm)])
-
-        domain = self._settings.value('domain_number', 0, type=int)
-        if domain != 0:
-            args.extend(['-n', str(domain)])
-
-        uds = self._settings.value('uds_address', '/var/run/ptp4l', type=str)
-        if uds != '/var/run/ptp4l':
-            args.extend(['-z', uds])
-
-        tag = self._settings.value('message_tag', '', type=str)
-        if tag:
-            args.extend(['-t', tag])
-
-        log_level = self._settings.value('logging_level', 6, type=int)
-        if log_level != 6:
-            args.extend(['-l', str(log_level)])
-
-        if self._settings.value('leap_servo', False, type=bool):
-            args.append('-x')
-
-        if self._settings.value('quiet_syslog', False, type=bool):
-            args.append('-q')
-
-        if self._settings.value('print_stdout', True, type=bool):
-            args.append('-m')
-
-        return args
+        return ['-f', CONFIG_PATH] + cli_flags

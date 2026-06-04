@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QComboBox, QPushButton, QTextEdit, QGroupBox,
-                               QFormLayout, QScrollArea)
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
+                               QLabel, QComboBox, QPushButton, QTextEdit,
+                               QGroupBox, QFormLayout, QScrollArea)
 from PyQt6.QtCore import Qt, QProcess, QSettings, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
 import os
@@ -45,26 +45,33 @@ class PTPTab(QWidget):
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        # ── Two-column top section ───────────────────────────────
+        # ── Two-column top section (QGroupBox + dynamic alignment) ─
         top_row = QHBoxLayout()
+        top_row.setSpacing(8)
 
         # ── Left: PTP4L ──────────────────────────────────────────
         ptp4l_group = QGroupBox("PTP4L")
         ptp4l_inner = QVBoxLayout(ptp4l_group)
 
-        iface_form = QFormLayout()
+        self._ptp4l_iface_box = QWidget()
+        iface_form = QFormLayout(self._ptp4l_iface_box)
         self.interface_combo = QComboBox()
         self.interface_combo.setMinimumWidth(200)
         iface_form.addRow("Interface:", self.interface_combo)
-        ptp4l_inner.addLayout(iface_form)
+        ptp4l_inner.addWidget(self._ptp4l_iface_box)
 
         self.settings_btn = QPushButton("Start Options")
         self.settings_btn.clicked.connect(self.open_settings)
         ptp4l_inner.addWidget(self.settings_btn)
 
+        ptp4l_btn_row2 = QHBoxLayout()
+        self.ptp4l_open_btn = QPushButton("Open ptp4l.conf")
+        self.ptp4l_open_btn.clicked.connect(self.open_ptp4l_config)
+        ptp4l_btn_row2.addWidget(self.ptp4l_open_btn)
         self.ptp4l_edit_btn = QPushButton("PTP4L Config Editor")
         self.ptp4l_edit_btn.clicked.connect(self.open_ptp4l_editor)
-        ptp4l_inner.addWidget(self.ptp4l_edit_btn)
+        ptp4l_btn_row2.addWidget(self.ptp4l_edit_btn)
+        ptp4l_inner.addLayout(ptp4l_btn_row2)
 
         ptp4l_inner.addStretch()
 
@@ -112,13 +119,32 @@ class PTPTab(QWidget):
         # ── Right: phc2sys ───────────────────────────────────────
         phc2sys_group = QGroupBox("phc2sys")
         phc2sys_inner = QVBoxLayout(phc2sys_group)
+        self._ptp4l_inner = ptp4l_inner
 
-        # Placeholder spacer so config button aligns with PTP4L column
-        phc2sys_inner.addSpacing(28)
+        # Info text + dynamic spacer to align editor buttons with PTP4L column
+        self._phc2sys_spacer_widget = QWidget()
+        psw_layout = QVBoxLayout(self._phc2sys_spacer_widget)
+        psw_layout.setContentsMargins(4, 2, 4, 2)
+        phc2sys_info = QLabel(
+            "phc2sys synchronizes the system clock with the PTP Hardware Clock (PHC).\n"
+            "Required when using USB NICs (e.g. ASIX AX88279) \u2013 these lack stable\n"
+            "hardware timestamping, so the system clock needs continuous correction."
+        )
+        phc2sys_info.setStyleSheet("color: #aaa; font-size: 10px;")
+        phc2sys_info.setWordWrap(True)
+        psw_layout.addWidget(phc2sys_info)
+        psw_layout.addStretch()
+        self._phc2sys_spacer_widget.setFixedHeight(1)
+        phc2sys_inner.addWidget(self._phc2sys_spacer_widget)
 
-        self.phc2sys_config_btn = QPushButton("phc2sys Config...")
-        self.phc2sys_config_btn.clicked.connect(self.open_phc2sys_config)
-        phc2sys_inner.addWidget(self.phc2sys_config_btn)
+        phc2sys_btn_row2 = QHBoxLayout()
+        self.phc2sys_open_btn = QPushButton("Open phc2sys.conf")
+        self.phc2sys_open_btn.clicked.connect(self.open_phc2sys_config_file)
+        phc2sys_btn_row2.addWidget(self.phc2sys_open_btn)
+        self.phc2sys_edit_btn = QPushButton("phc2sys Config Editor")
+        self.phc2sys_edit_btn.clicked.connect(self.open_phc2sys_config)
+        phc2sys_btn_row2.addWidget(self.phc2sys_edit_btn)
+        phc2sys_inner.addLayout(phc2sys_btn_row2)
 
         phc2sys_inner.addStretch()
 
@@ -164,6 +190,9 @@ class PTPTab(QWidget):
 
         top_row.addWidget(phc2sys_group)
         layout.addLayout(top_row)
+
+        # Dynamic alignment after first layout pass
+        QTimer.singleShot(0, self._align_columns)
 
         # ── Terminals (QSplitter) ────────────────────────────────
         from PyQt6.QtWidgets import QSplitter
@@ -227,6 +256,19 @@ class PTPTab(QWidget):
         self._phc2sys_sync_check = QTimer()
         self._phc2sys_sync_check.timeout.connect(self._phc2sys_check_sync)
         self._phc2sys_sync_check.start(2000)
+
+    def _align_columns(self):
+        try:
+            iface_h = self._ptp4l_iface_box.height()
+            settings_h = self.settings_btn.height()
+            spacing = self._ptp4l_inner.spacing()
+            if spacing < 0:
+                spacing = 6
+            total = iface_h + settings_h + spacing
+            if total > 1:
+                self._phc2sys_spacer_widget.setFixedHeight(total)
+        except Exception:
+            pass
 
     def load_interfaces(self):
         try:
@@ -461,7 +503,7 @@ class PTPTab(QWidget):
             tip = "Sync Status: waiting"
             label_text = ""
 
-        self.status_light.setStyleSheet(f"background-color: {color}; border-radius: 12px;")
+        self.status_light.setStyleSheet(f"background-color: {color}; border-radius: 10px;")
         self.status_light.setToolTip(tip)
         self.state_label.setText(label_text)
 
@@ -489,7 +531,7 @@ class PTPTab(QWidget):
     def _reset_status(self):
         self._ptp_state = ""
         self._ptp_offset = None
-        self.status_light.setStyleSheet("background-color: gray; border-radius: 12px;")
+        self.status_light.setStyleSheet("background-color: gray; border-radius: 10px;")
         self.status_light.setToolTip("Sync Status: stopped")
         self.state_label.setText("")
 
@@ -528,9 +570,32 @@ class PTPTab(QWidget):
     # ── phc2sys ──────────────────────────────────────────────────
 
     def open_phc2sys_config(self):
+        from core.phc2sys_config import Phc2sysConfig, CONFIG_PATH
         from ui.phc2sys_config_dialog import Phc2sysConfigDialog
-        dialog = Phc2sysConfigDialog(self)
-        dialog.exec()
+        from PyQt6.QtWidgets import QDialog
+        try:
+            cfg = Phc2sysConfig()
+            if not Path(CONFIG_PATH).exists():
+                cfg.create_default(CONFIG_PATH)
+                self.phc2sys_terminal.append(f"Created default config: {CONFIG_PATH}")
+            else:
+                cfg.load(CONFIG_PATH)
+            dialog = Phc2sysConfigDialog(cfg, self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.phc2sys_terminal.append("phc2sys config saved.")
+        except Exception as e:
+            self.phc2sys_terminal.append(f"Error loading phc2sys config: {e}")
+            import traceback as tb
+            self.phc2sys_terminal.append(tb.format_exc())
+
+    def open_phc2sys_config_file(self):
+        from PyQt6.QtCore import QProcess
+        from core.phc2sys_config import CONFIG_PATH
+        if Path(CONFIG_PATH).exists():
+            self.phc2sys_terminal.append(f"Opening config: {CONFIG_PATH}")
+            QProcess.startDetached("xdg-open", [CONFIG_PATH])
+        else:
+            self.phc2sys_terminal.append(f"Config not found: {CONFIG_PATH}")
 
     def _can_start_phc2sys(self):
         return self.is_ptp_running and self._ptp_state in ('SLAVE', 'MASTER')
@@ -542,12 +607,20 @@ class PTPTab(QWidget):
             self.phc2sys_terminal.append("PTP must be running and synced before starting phc2sys.")
             return
 
+        # Ensure config file exists
+        from core.phc2sys_config import Phc2sysConfig, CONFIG_PATH
+        if not Path(CONFIG_PATH).exists():
+            try:
+                cfg = Phc2sysConfig()
+                cfg.create_default(CONFIG_PATH)
+                self.phc2sys_terminal.append(f"Created default config: {CONFIG_PATH}")
+            except Exception as e:
+                self.phc2sys_terminal.append(f"Could not create config: {e}")
+                return
+
         from ui.phc2sys_config_dialog import Phc2sysConfigDialog
-        dlg = Phc2sysConfigDialog(self)
+        dlg = Phc2sysConfigDialog(Phc2sysConfig(), self)
         args = dlg.build_command()
-        if not args:
-            self.phc2sys_terminal.append("phc2sys: using config file – not implemented yet.")
-            return
 
         cmd = ['sudo', 'phc2sys'] + args
         cmd_str = ' '.join(cmd)
@@ -603,21 +676,27 @@ class PTPTab(QWidget):
 
     def _update_phc2sys_status(self):
         offset = self._phc2sys_offset
+        tip = 'phc2sys Status: stopped'
         if offset is None:
             color = 'gray'
             label = '\u2014'
+            tip = 'phc2sys Status: waiting for offset data'
         elif offset <= 10:
             color = '#4caf50'
             label = f'{offset} ns'
+            tip = f'phc2sys offset: {offset}ns (excellent)'
         elif offset <= 50:
             color = '#ffc107'
             label = f'{offset} ns'
+            tip = f'phc2sys offset: {offset}ns (okay)'
         else:
             color = '#f44336'
             label = f'{offset} ns'
+            tip = f'phc2sys offset: {offset}ns (poor)'
 
         self.phc2sys_light.setStyleSheet(
             f'background-color: {color}; border-radius: 10px;')
+        self.phc2sys_light.setToolTip(tip)
         if offset is not None:
             self.phc2sys_state_label.setText(label)
         else:

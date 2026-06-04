@@ -10,9 +10,9 @@ import pwd
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QGridLayout, QProgressBar, QScrollArea
+    QGroupBox, QGridLayout, QProgressBar, QScrollArea, QCheckBox
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QFont, QColor
 
 from core.version import __version__, __app_name__
@@ -68,9 +68,9 @@ class SessionTab(QWidget):
         self.pw = pipewire_tab
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._update_status)
-        self._waiting_for_ptp = False
-        self._ptp_wait_timer = QTimer(self)
-        self._ptp_wait_timer.timeout.connect(self._check_ptp_and_start_aes67)
+        self._session_phase = 'idle'
+        self._session_timer = QTimer(self)
+        self._session_timer.timeout.connect(self._session_tick)
         self.init_ui()
         self._timer.start(2000)
 
@@ -104,6 +104,19 @@ class SessionTab(QWidget):
 
         qs_layout.addWidget(self.start_btn)
         qs_layout.addWidget(self.stop_btn)
+
+        settings = QSettings('sync67', 'session_settings')
+        self.phc2sys_cb = QCheckBox('phc2sys')
+        self.phc2sys_cb.setChecked(settings.value('qs_phc2sys', False, type=bool))
+        self.phc2sys_cb.stateChanged.connect(
+            lambda s: settings.setValue('qs_phc2sys', s == Qt.CheckState.Checked.value)
+        )
+        self.phc2sys_cb.setToolTip(
+            'Synchronize system clock to PTP Hardware Clock (PHC).\n'
+            'Recommended for USB NICs (e.g. ASIX AX88279); also useful\n'
+            'with PCIe NICs to correct system clock drift over time.'
+        )
+        qs_layout.addWidget(self.phc2sys_cb)
         qs_layout.addStretch()
         layout.addWidget(qs_group)
 
@@ -126,10 +139,14 @@ class SessionTab(QWidget):
         self.pw_status = QLabel('\u25cf PipeWire: \u2014')
         self.pw_status.setStyleSheet('font-size: 13px;')
 
+        self.phc2sys_status = QLabel('\u25cf phc2sys: \u2014')
+        self.phc2sys_status.setStyleSheet('font-size: 13px;')
+
         ss_grid.addWidget(self.ptp_status, 0, 0)
         ss_grid.addWidget(self.ptp_sync_label, 0, 1)
-        ss_grid.addWidget(self.aes67_status, 1, 0, 1, 2)
-        ss_grid.addWidget(self.pw_status, 2, 0, 1, 2)
+        ss_grid.addWidget(self.phc2sys_status, 1, 0, 1, 2)
+        ss_grid.addWidget(self.aes67_status, 2, 0, 1, 2)
+        ss_grid.addWidget(self.pw_status, 3, 0, 1, 2)
         layout.addWidget(ss_group)
 
         # ── Sync / Xruns / DSP ──
@@ -146,6 +163,19 @@ class SessionTab(QWidget):
         sync_box.addWidget(self.sync_light)
         sync_box.addWidget(self.sync_label)
         metrics.addLayout(sync_box)
+        metrics.addSpacing(24)
+
+        # phc2sys Health
+        phc2sys_box = QVBoxLayout()
+        phc2sys_box.addWidget(QLabel('phc2sys'))
+        self.phc2sys_light = QLabel()
+        self.phc2sys_light.setFixedSize(32, 32)
+        self.phc2sys_light.setStyleSheet('background-color: gray; border-radius: 16px;')
+        self.phc2sys_health_label = QLabel('\u2014')
+        self.phc2sys_health_label.setStyleSheet('font-size: 11px; color: #888;')
+        phc2sys_box.addWidget(self.phc2sys_light)
+        phc2sys_box.addWidget(self.phc2sys_health_label)
+        metrics.addLayout(phc2sys_box)
         metrics.addSpacing(24)
 
         # AES67 Health
@@ -339,21 +369,26 @@ class SessionTab(QWidget):
     def _session_start(self):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
+        self._use_phc2sys = self.phc2sys_cb.isChecked()
         self.session_state_label.setText('Starting PTP...')
 
-        # 1. PTP starten
         if hasattr(self.ptp, 'start_ptp'):
             self.ptp.start_ptp()
-        # 2. Auf PTP-Sync warten, dann AES67 starten
-        self._waiting_for_ptp = True
-        self._ptp_wait_timer.start(500)
+        self._session_phase = 'wait_ptp'
+        self._session_timer.start(500)
 
-    def _check_ptp_and_start_aes67(self):
+    def _session_tick(self):
+        if self._session_phase == 'wait_ptp':
+            self._check_ptp_done()
+        elif self._session_phase == 'wait_phc2sys':
+            self._check_phc2sys_done()
+
+    def _check_ptp_done(self):
         ptp_running = getattr(self.ptp, 'is_ptp_running', False)
         if not ptp_running:
             self.session_state_label.setText('PTP failed to start or exited.')
-            self._ptp_wait_timer.stop()
-            self._waiting_for_ptp = False
+            self._session_timer.stop()
+            self._session_phase = 'idle'
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
             return
@@ -361,8 +396,8 @@ class SessionTab(QWidget):
         ptp_state = getattr(self.ptp, '_ptp_state', '')
         ptp_offset = getattr(self.ptp, '_ptp_offset', None)
         ptp_ready = (
-            ptp_state == 'MASTER' or
-            (ptp_state == 'SLAVE' and ptp_offset is not None and ptp_offset <= 1000)
+            ptp_state == 'MASTER'
+            or (ptp_state == 'SLAVE' and ptp_offset is not None and ptp_offset <= 1000)
         )
         if not ptp_ready:
             self.session_state_label.setText(
@@ -371,20 +406,50 @@ class SessionTab(QWidget):
             )
             return
 
-        # PTP sync ready → start AES67
-        self._ptp_wait_timer.stop()
-        self._waiting_for_ptp = False
-        self.session_state_label.setText('PTP sync OK, starting AES67...')
+        if self._use_phc2sys:
+            self.session_state_label.setText('PTP sync OK, starting phc2sys...')
+            if hasattr(self.ptp, 'start_phc2sys'):
+                self.ptp.start_phc2sys()
+            self._session_phase = 'wait_phc2sys'
+        else:
+            self._start_aes67()
+
+    def _check_phc2sys_done(self):
+        phc2sys_running = getattr(self.ptp, 'is_phc2sys_running', False)
+        if not phc2sys_running:
+            self.session_state_label.setText('phc2sys failed to start or exited.')
+            self._session_timer.stop()
+            self._session_phase = 'idle'
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            return
+
+        offset = getattr(self.ptp, '_phc2sys_offset', None)
+        if offset is not None and offset <= 50:
+            self._start_aes67()
+        elif offset is not None:
+            self.session_state_label.setText(
+                f'Waiting for phc2sys sync... (offset: {offset}ns)'
+            )
+        else:
+            self.session_state_label.setText('Waiting for phc2sys offset...')
+
+    def _start_aes67(self):
+        self._session_timer.stop()
+        self._session_phase = 'idle'
+        self.session_state_label.setText('Sync OK, starting AES67...')
         if hasattr(self.aes67, 'start_aes67'):
             self.aes67.start_aes67()
         QTimer.singleShot(3000, lambda: self.session_state_label.setText(''))
 
     def _session_stop(self):
-        if self._waiting_for_ptp:
-            self._ptp_wait_timer.stop()
-            self._waiting_for_ptp = False
+        if self._session_phase != 'idle':
+            self._session_timer.stop()
+            self._session_phase = 'idle'
         if hasattr(self.aes67, 'stop_aes67'):
             self.aes67.stop_aes67()
+        if hasattr(self.ptp, 'stop_phc2sys'):
+            self.ptp.stop_phc2sys()
         if hasattr(self.ptp, 'stop_ptp'):
             self.ptp.stop_ptp()
         self.session_state_label.setText('')
@@ -438,6 +503,40 @@ class SessionTab(QWidget):
             label_text = '\u2014'
         self.sync_light.setStyleSheet(f'background-color: {color}; border-radius: 16px;')
         self.sync_label.setText(label_text)
+
+        # phc2sys
+        phc2sys_running = getattr(self.ptp, 'is_phc2sys_running', False)
+        if phc2sys_running:
+            self.phc2sys_status.setText('\u25cf phc2sys: RUNNING')
+            self.phc2sys_status.setStyleSheet('font-size: 13px; color: #4caf50;')
+        else:
+            self.phc2sys_status.setText('\u25cf phc2sys: stopped')
+            self.phc2sys_status.setStyleSheet('font-size: 13px; color: #888;')
+
+        # phc2sys Health ampel
+        phc2sys_offset = getattr(self.ptp, '_phc2sys_offset', None)
+        if phc2sys_running and phc2sys_offset is not None:
+            if phc2sys_offset <= 10:
+                phc2sys_color = '#4caf50'
+                phc2sys_health = f'OK ({phc2sys_offset}ns)'
+            elif phc2sys_offset <= 50:
+                phc2sys_color = '#ffc107'
+                phc2sys_health = f'{phc2sys_offset}ns'
+            else:
+                phc2sys_color = '#f44336'
+                phc2sys_health = f'{phc2sys_offset}ns'
+        elif phc2sys_running:
+            phc2sys_color = 'gray'
+            phc2sys_health = 'Waiting...'
+        else:
+            phc2sys_color = 'gray'
+            phc2sys_health = '\u2014'
+        self.phc2sys_light.setStyleSheet(
+            f'background-color: {phc2sys_color}; border-radius: 16px;'
+        )
+        self.phc2sys_health_label.setText(phc2sys_health)
+        phc2sys_label_color = phc2sys_color if phc2sys_color != 'gray' else '#888'
+        self.phc2sys_health_label.setStyleSheet(f'font-size: 11px; color: {phc2sys_label_color};')
 
         # AES67
         aes67_running = getattr(self.aes67, 'is_running', False)
