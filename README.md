@@ -12,6 +12,7 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
 ## Features
 
 ### PTP Tab
+![PTP Tab](assets/ptp_tab+config_editor.png)
 
 - ptp4l start/stop with live terminal output
 - Sync indicator (traffic light: green ≤200ns, yellow ≤1000ns, red) + port state
@@ -20,18 +21,21 @@ A Linux desktop tool for managing, monitoring and configuring **AES67 audio stre
 - **phc2sys**: start/stop with status ampel + config editor, auto-detected PHC device
 
 ### AES67 Tab
+![AES67 Tab](assets/aes67-tab+config-editor.png)
 
 - pipewire-aes67 start/stop with live terminal output, verbose mode toggle
 - Stream health monitor with DSP load and log-based severity (green/yellow/red)
 - **AES67 Config Editor**: format-preserving GUI for `pipewire-aes67.conf` (40 parameters, 4 tabs, RTP Sink multi-instance, stream.rules raw editor)
 
 ### PipeWire Tab
+![PipeWire Tab](assets/pipewire-tab.png)
 
 - Sample rate / quantum control with Apply/Reset/Refresh
 - Node table with tree structure (ID, status, name, quantum, format, channels, DSP, xruns, rate)
 - Xruns counter (click to reset), DSP load bar, latency display
 
 ### Session Tab
+![Session Tab](assets/session-tab.png)
 
 - **Quick-Start**: single-button start/stop with correct ordering
   - Optional phc2sys integration (checkbox, default off)
