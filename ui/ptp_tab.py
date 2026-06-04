@@ -619,7 +619,12 @@ class PTPTab(QWidget):
                 return
 
         from ui.phc2sys_config_dialog import Phc2sysConfigDialog
-        dlg = Phc2sysConfigDialog(Phc2sysConfig(), self)
+        cfg = Phc2sysConfig()
+        try:
+            cfg.load(CONFIG_PATH)
+        except Exception:
+            pass
+        dlg = Phc2sysConfigDialog(cfg, self)
         args = dlg.build_command()
 
         cmd = ['sudo', 'phc2sys'] + args

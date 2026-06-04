@@ -511,4 +511,14 @@ class Phc2sysConfigDialog(QDialog):
 
         cli_flags.append('-m')
 
+        # Pass -z (uds_address) from config if explicitly set
+        uds = self.config.get('uds_address')
+        if uds:
+            cli_flags.extend(['-z', str(uds)])
+
+        # Pass -z (uds_address) from config if explicitly set
+        uds = self.config.get('uds_address')
+        if uds:
+            cli_flags.extend(['-z', str(uds)])
+
         return ['-f', CONFIG_PATH] + cli_flags
