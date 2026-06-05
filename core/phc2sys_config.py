@@ -62,16 +62,19 @@ class Phc2sysConfig:
         ]
 
         dirty_keys = set(self._dirty)
+        deleted_keys = {k.replace('__delete__', '') for k in dirty_keys if k.startswith('__delete__')}
+        dirty_keys = {k for k in dirty_keys if not k.startswith('__delete__')}
 
         # Include keys from file that are not dirty and differ from defaults
         for key, val in self._data.items():
-            if key not in dirty_keys and val != BUILTIN_DEFAULTS.get(key):
+            if key not in dirty_keys and key not in deleted_keys and val != BUILTIN_DEFAULTS.get(key):
                 dirty_keys.add(key)
 
         for key in sorted(dirty_keys):
+            if key in deleted_keys:
+                continue
             val = self._data[key]
-            if val != BUILTIN_DEFAULTS.get(key):
-                lines.append(f'{key} {self._format_value(val)}')
+            lines.append(f'{key} {self._format_value(val)}')
 
         lines.append('')
         text = '\n'.join(lines)
@@ -88,8 +91,15 @@ class Phc2sysConfig:
         if key in self._data and self._data[key] == value:
             return False
         self._data[key] = value
+        self._dirty.discard(f'__delete__{key}')
         self._dirty.add(key)
         return True
+
+    def delete(self, key):
+        if key in self._data:
+            del self._data[key]
+            self._dirty.discard(key)
+            self._dirty.add(f'__delete__{key}')
 
     def reset_to_default(self):
         self._data = {}
