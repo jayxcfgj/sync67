@@ -891,6 +891,9 @@ class AES67SettingsDialog(QDialog):
                 val = m.group('value').rstrip(',')
                 if re.match(r'^\d+\.\d+\.\d+\.\d+$', val):
                     self.config._raw_lines[i] = f'{indent}{m.group("key")} = "{val}"'
+        # Restore accidentally commented args blocks
+        if stripped == '# args = {':
+            self.config._raw_lines[i] = f'{indent}args = {{'
 
     def _reload_all_widgets(self):
         """Reload all widget values from config."""
