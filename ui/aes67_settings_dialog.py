@@ -861,12 +861,36 @@ class AES67SettingsDialog(QDialog):
         try:
             self.config.reset_to_default()
             self.config.load(self.config.get_loaded_path())
+            self._fix_config_format()
+            self.config.save()
+            self.config.load(self.config.get_loaded_path())
             QMessageBox.information(self, 'Reset',
                                     'Config reset to Default.')
             self._rebuild_sink_tabs()
             self._reload_all_widgets()
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Reset failed:\n{e}')
+
+    def _fix_config_format(self):
+        """Fix common formatting issues after loading a raw default config:
+        - Comment out lines with empty values (key = )
+        - Quote IP addresses (239.x.x.x)
+        """
+        for i, line in enumerate(self.config._raw_lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            indent = line[:len(line) - len(line.lstrip())]
+            # Empty value: key = (nothing after =)
+            m = re.match(r'^(?P<key>[\w.\-*]+)\s*=\s*(?P<value>\S.*)?$', stripped)
+            if m and m.group('value') is None:
+                self.config._raw_lines[i] = f'{indent}# {m.group("key")} = (unset)'
+                continue
+            # IP address without quotes
+            if m and m.group('value') is not None:
+                val = m.group('value').rstrip(',')
+                if re.match(r'^\d+\.\d+\.\d+\.\d+$', val):
+                    self.config._raw_lines[i] = f'{indent}{m.group("key")} = "{val}"'
 
     def _reload_all_widgets(self):
         """Reload all widget values from config."""
