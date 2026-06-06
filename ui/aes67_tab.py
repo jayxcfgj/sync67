@@ -73,6 +73,7 @@ class AES67Tab(QWidget):
             try:
                 self.config = AES67Config()
                 self.config.load(self.default_config_path)
+                self.config._loaded_path = self.config_path
             except (ConfigParseError, FileNotFoundError):
                 self.config = None
 
