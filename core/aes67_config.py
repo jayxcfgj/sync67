@@ -104,7 +104,7 @@ def format_value(value):
         return 'null'
     # Quote strings that contain spaces or special characters
     val = str(value)
-    if ' ' in val or '"' in val or val.startswith('#') or '=' in val:
+    if ' ' in val or '"' in val or val.startswith('#') or '=' in val or '.' in val:
         if not val.startswith('"'):
             val = '"' + val.replace('"', '\\"') + '"'
     return val
