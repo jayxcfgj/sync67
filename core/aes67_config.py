@@ -172,9 +172,9 @@ class AES67Config:
                         return None
                     val = val[key]
                 elif val and isinstance(val[0], dict):
-                    found = [v for v in val if v.get('name') == key]
+                    found = [v for v in val if isinstance(v, dict) and v.get('name') == key]
                     if not found:
-                        found = [v for v in val if key in v.get('name', '')]
+                        found = [v for v in val if isinstance(v, dict) and key in v.get('name', '')]
                     if not found:
                         return None
                     val = found[0]
@@ -201,7 +201,7 @@ class AES67Config:
                         return False
                     parent = parent[key]
                 elif parent and isinstance(parent[0], dict):
-                    found = [v for v in parent if v.get('name') == key or key in v.get('name', '')]
+                    found = [v for v in parent if isinstance(v, dict) and (v.get('name') == key or key in v.get('name', ''))]
                     if not found:
                         return False
                     parent = found[0]

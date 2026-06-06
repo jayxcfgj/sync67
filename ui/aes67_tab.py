@@ -9,7 +9,7 @@ import shutil
 import time
 import traceback
 
-from core.aes67_config import AES67Config
+from core.aes67_config import AES67Config, ConfigParseError
 from core.aes67_log_parser import AES67LogParser, LOG_PATTERNS
 
 _MAX_TERMINAL_LINES = 5000
@@ -69,6 +69,12 @@ class AES67Tab(QWidget):
             self.config.load(self.config_path)
         except FileNotFoundError:
             self.config = None
+        except ConfigParseError:
+            try:
+                self.config = AES67Config()
+                self.config.load(self.default_config_path)
+            except (ConfigParseError, FileNotFoundError):
+                self.config = None
 
     def init_ui(self):
         scroll = QScrollArea()
