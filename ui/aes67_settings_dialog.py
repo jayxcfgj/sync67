@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QFormLayout, QWidget, QScrollArea,
     QMessageBox, QGridLayout, QApplication
 )
-from PyQt6.QtCore import Qt, QRegularExpression
+from PyQt6.QtCore import Qt, QRegularExpression, QSettings, QProcess
 from PyQt6.QtGui import QRegularExpressionValidator, QPalette, QColor
 
 from core.aes67_config import AES67Config
@@ -478,10 +478,13 @@ class AES67SettingsDialog(QDialog):
         self.system_clock_cb = None
         self._has_changes = False
 
+
         self.setWindowTitle('AES67 Config Editor')
         self.setMinimumSize(400, 250)
         self.resize(700, 600)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
+        self._fix_config_format()
+        self.config._parse()
         self._init_ui()
 
     def _apply_dark_theme(self):
@@ -635,27 +638,39 @@ class AES67SettingsDialog(QDialog):
             form.addRow(container)
             self.widgets[pdef.key] = pw
 
-        # System-Clock Checkbox (shortcut: comment out both interface + device)
+        # System-Clock Checkbox (shortcut: phc2sys-compatible mode)
         self.system_clock_cb = QCheckBox('Use System Clock (dedicated for phc2sys)')
         self.system_clock_cb.setToolTip(
-            'When enabled: clock.interface and clock.device are commented out.\n'
-            'pipewire-aes67 will not manage the PHC directly.\n'
+            'When enabled: clock.interface and clock.device are commented out,\n'
+            'clock.id is set to "realtime".\n'
+            'pipewire-aes67 uses CLOCK_REALTIME instead of PHC directly.\n'
             'Required when using phc2sys for clock synchronization.'
         )
-        # Check if clock.interface / clock.device is currently commented out
+        # Derive checkbox state from actual config
         is_iface_commented = self._is_key_commented('context.objects', 0, 'args', 'clock.interface')
         is_dev_commented = self._is_key_commented('context.objects', 0, 'args', 'clock.device')
-        self.system_clock_cb.setChecked(is_iface_commented or is_dev_commented)
-        self.system_clock_cb.stateChanged.connect(self._on_system_clock_toggled)
+        cid = self.config.get('context.objects', 0, 'args', 'clock.id')
+        is_realtime = cid and str(cid).strip('"') == 'realtime'
+        self.system_clock_cb.setChecked((is_iface_commented or is_dev_commented) and is_realtime)
+        self.system_clock_cb.toggled.connect(self._on_system_clock_toggled)
         form.addRow(self.system_clock_cb)
+        # Apply phc2sys mode to widgets if checkbox is checked
+        if self.system_clock_cb.isChecked():
+            self._apply_system_clock_mode(True)
+        else:
+            self._default_sap_sink_interfaces()
+            self._default_clock_interfaces()
 
-        # Sync checkbox when dropdowns change
+        # Sync checkbox when dropdowns or clock.id change
         iface_w = self.widgets.get('clock.interface')
         dev_w = self.widgets.get('clock.device')
+        id_w = self.widgets.get('clock.id')
         if iface_w:
             iface_w.widget.currentIndexChanged.connect(self._sync_system_clock_cb)
         if dev_w:
             dev_w.widget.currentIndexChanged.connect(self._sync_system_clock_cb)
+        if id_w:
+            id_w.widget.textChanged.connect(self._sync_system_clock_cb)
 
         scroll.setWidget(content)
         self.tabs.addTab(scroll, 'PTP Clock')
@@ -804,10 +819,15 @@ class AES67SettingsDialog(QDialog):
                     if not self.config.set(value, *keys):
                         print(f"Warning: could not save {key}")
 
-            # System clock checkbox – force-comment both interface and device
+            # System clock checkbox – force phc2sys-compatible mode
             if self.system_clock_cb and self.system_clock_cb.isChecked():
                 self.config.comment_key('context.objects', 0, 'args', 'clock.interface')
                 self.config.comment_key('context.objects', 0, 'args', 'clock.device')
+                self.config.uncomment_key('context.objects', 0, 'args', 'clock.id')
+                self.config.set('"realtime"', 'context.objects', 0, 'args', 'clock.id')
+                self.config.comment_key('context.modules', 'libpipewire-module-rtp-sap', 'args', 'local.ifname')
+                for tab in self.rtp_sink_tabs:
+                    self.config.comment_key('context.modules', tab.sink_index, 'args', 'local.ifname')
 
             # Collect sink tab values
             for tab in self.rtp_sink_tabs:
@@ -816,7 +836,9 @@ class AES67SettingsDialog(QDialog):
                     pdef = PARAM_MAP.get(key)
                     if pdef and pdef.module == 'libpipewire-module-rtp-sink':
                         keys = ('context.modules', tab.sink_index) + pdef.path
-                        if not self.config.set(val, *keys):
+                        if key == 'sink.local.ifname' and val == '':
+                            self.config.comment_key(*keys)
+                        elif not self.config.set(val, *keys):
                             print(f"Warning: could not save {key} for sink {tab.sink_index}")
 
             # Save stream.rules raw editor
@@ -866,10 +888,11 @@ class AES67SettingsDialog(QDialog):
             self.config.load(self.config.get_loaded_path())
             QMessageBox.information(self, 'Reset',
                                     'Config reset to Default.')
-            self._rebuild_sink_tabs()
-            self._reload_all_widgets()
+            self._has_changes = False
+            self.accept()
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Reset failed:\n{e}')
+            self.reject()
 
     def _fix_config_format(self):
         """Fix common formatting issues after loading a raw default config:
@@ -878,9 +901,13 @@ class AES67SettingsDialog(QDialog):
         """
         for i, line in enumerate(self.config._raw_lines):
             stripped = line.strip()
+            indent = line[:len(line) - len(line.lstrip())]
+            # Restore accidentally commented args blocks (before skip-comments check)
+            if stripped == '# args = {':
+                self.config._raw_lines[i] = f'{indent}args = {{'
+                continue
             if not stripped or stripped.startswith('#'):
                 continue
-            indent = line[:len(line) - len(line.lstrip())]
             # Empty value: key = (nothing after =)
             m = re.match(r'^(?P<key>[\w.\-*]+)\s*=\s*(?P<value>\S.*)?$', stripped)
             if m and m.group('value') is None:
@@ -891,9 +918,16 @@ class AES67SettingsDialog(QDialog):
                 val = m.group('value').rstrip(',')
                 if re.match(r'^\d+\.\d+\.\d+\.\d+$', val):
                     self.config._raw_lines[i] = f'{indent}{m.group("key")} = "{val}"'
-        # Restore accidentally commented args blocks
-        if stripped == '# args = {':
-            self.config._raw_lines[i] = f'{indent}args = {{'
+                    continue
+            # Fix old PTP management socket path (/var/run/ptp4lro → /var/run/ptp/ptp4lro)
+            if m and m.group('key') == 'ptp.management-socket':
+                old_val = m.group('value').strip('"').rstrip(',')
+                if old_val == '/var/run/ptp4lro':
+                    self.config._raw_lines[i] = f'{indent}ptp.management-socket = "/var/run/ptp/ptp4lro"'
+                    continue
+            # Normalise rlimits.enabled to True (PipeWire ships with false, we default to true)
+            if m and m.group('key') == 'rlimits.enabled' and m.group('value').strip(',') == 'false':
+                self.config._raw_lines[i] = f'{indent}rlimits.enabled = true'
 
     def _reload_all_widgets(self):
         """Reload all widget values from config."""
@@ -917,21 +951,98 @@ class AES67SettingsDialog(QDialog):
             return
         iface_w = self.widgets.get('clock.interface')
         dev_w = self.widgets.get('clock.device')
+        id_w = self.widgets.get('clock.id')
         iface_empty = iface_w and iface_w.widget.currentIndex() == 0
         dev_empty = dev_w and dev_w.widget.currentIndex() == 0
+        id_is_realtime = id_w and id_w.widget.text().strip('"') == 'realtime'
         blocked = self.system_clock_cb.blockSignals(True)
-        self.system_clock_cb.setChecked(iface_empty or dev_empty)
+        self.system_clock_cb.setChecked((iface_empty or dev_empty) and id_is_realtime)
         self.system_clock_cb.blockSignals(blocked)
 
-    def _on_system_clock_toggled(self, checked):
-        """User toggled the system-clock checkbox → sync dropdowns."""
+    def _default_sap_sink_interfaces(self):
+        """Pre-fill empty SAP/sink interface widgets with the ptp4l interface."""
+        ptp_iface = self._ptp4l_interface()
+        if not ptp_iface:
+            return
+        sap_w = self.widgets.get('sap.local.ifname')
+        if sap_w and sap_w.get_value() == '':
+            sap_w.set_value(ptp_iface)
+        for tab in self.rtp_sink_tabs:
+            sw = tab.widgets.get('sink.local.ifname')
+            if sw and sw.get_value() == '':
+                sw.set_value(ptp_iface)
+
+    def _default_clock_interfaces(self):
+        """Pre-fill empty clock.interface/device with ptp4l values on init."""
+        ptp_iface = self._ptp4l_interface()
+        if not ptp_iface:
+            return
+        iface_w = self.widgets.get('clock.interface')
+        if iface_w and iface_w.get_value() == '':
+            iface_w.set_value(ptp_iface)
+        dev_w = self.widgets.get('clock.device')
+        if dev_w and dev_w.get_value() == '':
+            phc = self._phc_for_interface(ptp_iface)
+            if phc:
+                dev_w.set_value(phc)
+
+    @staticmethod
+    def _phc_for_interface(iface):
+        """Find the PHC device for a network interface via ethtool -T."""
+        try:
+            proc = QProcess()
+            proc.start('ethtool', ['-T', iface])
+            proc.waitForFinished(5000)
+            out = bytes(proc.readAllStandardOutput()).decode('utf-8', errors='replace')
+            m = re.search(r'PTP Hardware Clock:\s*(\d+)', out)
+            if m:
+                return f'/dev/ptp{m.group(1)}'
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _ptp4l_interface():
+        """Read the configured ptp4l interface from QSettings."""
+        qs = QSettings("sync67", "ptp_settings")
+        return qs.value("selected_interface", "", type=str)
+
+    def _apply_system_clock_mode(self, checked):
+        """Apply or restore phc2sys mode to widgets without saving to QSettings."""
         iface_w = self.widgets.get('clock.interface')
         dev_w = self.widgets.get('clock.device')
+        id_w = self.widgets.get('clock.id')
+        sap_w = self.widgets.get('sap.local.ifname')
         if checked:
             if iface_w:
                 iface_w.widget.setCurrentIndex(0)
             if dev_w:
                 dev_w.widget.setCurrentIndex(0)
+            if id_w:
+                id_w.widget.setText("realtime")
+            if sap_w:
+                sap_w.widget.setCurrentIndex(0)
+            for tab in self.rtp_sink_tabs:
+                sw = tab.widgets.get('sink.local.ifname')
+                if sw:
+                    sw.widget.setCurrentIndex(0)
+        else:
+            ptp_iface = self._ptp4l_interface()
+            if iface_w and ptp_iface:
+                iface_w.set_value(ptp_iface)
+            phc_dev = self._phc_for_interface(ptp_iface) if ptp_iface else None
+            if dev_w and phc_dev:
+                dev_w.set_value(phc_dev)
+            if sap_w and ptp_iface:
+                sap_w.set_value(ptp_iface)
+            for tab in self.rtp_sink_tabs:
+                sw = tab.widgets.get('sink.local.ifname')
+                if sw and ptp_iface:
+                    sw.set_value(ptp_iface)
+
+    def _on_system_clock_toggled(self, checked):
+        """User toggled the system-clock checkbox."""
+        self._apply_system_clock_mode(checked)
         self._mark_changes()
 
     def _mark_changes(self):

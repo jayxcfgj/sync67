@@ -144,8 +144,11 @@ class AES67Config:
         path = str(path or self._loaded_path)
         if not path:
             raise ConfigWriteError("No path specified")
-        if os.path.exists(path):
-            shutil.copy(path, path + '.bak')
+        try:
+            if os.path.exists(path):
+                shutil.copy(path, path + '.bak')
+        except OSError:
+            pass  # non-critical, continue saving
         try:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             text = '\n'.join(self._raw_lines)
@@ -268,6 +271,94 @@ class AES67Config:
                     self._raw_lines.insert(insert_at, new_line)
         self._modified = True
         return True
+
+    def _find_line_idx_raw(self, keys):
+        """Find raw line index for key path, including commented lines.
+
+        Tracks brace depth and counts module/object instances to resolve
+        integer indices. Unlike _find_line_idx, this does NOT skip
+        commented lines.
+        """
+        if len(keys) < 3:
+            return None
+        section = keys[0]
+        obj_key = keys[1]
+        target = keys[-1]
+        if section not in ('context.modules', 'context.objects'):
+            return None
+        id_field = 'name' if section == 'context.modules' else 'factory'
+        obj_idx = obj_key if isinstance(obj_key, int) else None
+        in_section = False
+        in_target = False
+        in_args = False
+        depth = 0
+        obj_count = -1
+        for idx, line in enumerate(self._raw_lines):
+            stripped = line.strip()
+            content = stripped.lstrip('#').lstrip()
+            if not content:
+                continue
+            if not in_section:
+                pat = f'{section} = ['
+                if content.startswith(pat):
+                    in_section = True
+                continue
+            opens = content.count('{')
+            closes = content.count('}')
+            if opens > 0 and depth == 0:
+                obj_count += 1
+            depth += opens - closes
+            if opens > 0 and depth > 0 and depth <= opens:
+                in_target = False
+                in_args = False
+                if obj_idx is None:
+                    in_target = f'{id_field} = {obj_key}' in content
+                else:
+                    in_target = obj_count == obj_idx
+            if in_target:
+                bm = _BLOCK_START_RE.match(content)
+                if bm and bm.group('key') == 'args':
+                    in_args = True
+            if in_target and in_args:
+                km = _KV_RE.match(content)
+                if km and km.group('key') == target:
+                    return idx
+                im = _INLINE_ARRAY_RE.match(content)
+                if im and im.group('key') == target:
+                    return idx
+            if depth == 0 and in_target:
+                in_target = False
+                in_args = False
+                if in_section:
+                    pass  # end of this object/module
+        return None
+
+    def get_raw_value(self, *keys):
+        """Read a key's value from _raw_lines even if commented.
+
+        Returns the parsed value (int/float/bool/str) or None if not found.
+        Unlike get(), this extracts from commented lines too.
+        """
+        if len(keys) < 2:
+            return None
+        line_idx = self._find_line_idx(keys)
+        if line_idx is None:
+            line_idx = self._find_line_idx_raw(keys)
+        if line_idx is None:
+            return None
+        line = self._raw_lines[line_idx]
+        stripped = line.strip().lstrip('#').lstrip()
+        m = _KV_RE.match(stripped)
+        if not m:
+            return None
+        val_str = m.group('value')
+        if val_str is None:
+            return None
+        val_str = val_str.rstrip(',')
+        try:
+            return parse_value(val_str)
+        except (ValueError, TypeError):
+            return val_str
 
     def comment_key(self, *keys):
         """Comment out a key's line in _raw_lines by prepending '# '.

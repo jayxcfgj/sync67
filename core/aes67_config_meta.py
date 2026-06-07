@@ -170,10 +170,10 @@ CONFIG_PARAMS: list[ParamDef] = [
              section='RTP SAP Input'),
     ParamDef('ptp.management-socket', 'libpipewire-module-rtp-sap',
              ('args', 'ptp.management-socket'), 'string',
-             '"/var/run/ptp4lro"',
+             '/var/run/ptp/ptp4lro',
              label='PTP Management Socket',
-             tooltip='UNIX socket for PTP management messages.\n'
-                     'Only required for ptp4l version 4.',
+             tooltip='Path to ptp4l read-only UNIX domain socket.\n'
+                     'Must match uds_ro_address in ptp4l.conf.',
              section='RTP SAP Input'),
     ParamDef('sap.sess.latency.msec', 'libpipewire-module-rtp-sap',
              ('args', 'sess.latency.msec'), 'int',

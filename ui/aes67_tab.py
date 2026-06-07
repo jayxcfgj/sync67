@@ -549,3 +549,21 @@ class AES67Tab(QWidget):
         self._update_timer.stop()
         self.ptp_check_timer.start(1000)
         self._check_ptp_state()
+        self._reset_display()
+
+    def _reset_display(self):
+        self.aes67_dsp_label.setText("0%")
+        self.aes67_dsp_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #888;")
+        self.aes67_dsp_bar.setValue(0)
+        self.aes67_dsp_bar.setStyleSheet(
+            "QProgressBar { background-color: #333; border: none; border-radius: 2px; min-height: 14px; }"
+        )
+        self.health_label.setText("\u25cf Idle")
+        self.health_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #888;")
+        for p in LOG_PATTERNS:
+            self._counter_labels[p['key']].setText("0")
+            self._counter_labels[p['key']].setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
+        self._other_val.setText("0")
+        self._other_val.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
+        self._last_summary.clear()
+        self._last_advice.clear()
