@@ -406,12 +406,14 @@ class Phc2sysConfigDialog(QDialog):
         self._load_qset_widget('pps_device')
         self._add_row(lo, 'PPS device (-d)', self._widgets['pps_device'][0], '')
 
-        # Config param: leap_seconds
-        self._make_config_row(lo, 'leap_seconds', 'Leap seconds (-O)',
-                              QLineEdit(), 0, minv=None,
-                              tooltip='UTC-TAI offset in seconds.\n'
-                                      'Config file equivalent of -O.\n'
-                                      'Currently 37. Set to 0 for auto-learn.')
+        # Leap seconds (-O) as CLI-only param, not in config file
+        self._reg('leap_seconds', QLineEdit(), '',
+                  tooltip='UTC-TAI offset in seconds (-O).\n'
+                          'Currently 37 (as of 2025+).\n'
+                          'Set to 0 for auto-learn (when using -w).\n'
+                          'Passed as -O <value> on the command line.')
+        self._load_qset_widget('leap_seconds', default='')
+        self._add_row(lo, 'Leap seconds (-O)', self._widgets['leap_seconds'][0], '')
 
         lo.addStretch()
         self.tabs.addTab(self._make_scroll(lo), 'Manual')
@@ -444,9 +446,6 @@ class Phc2sysConfigDialog(QDialog):
         self._save_config_widget('transportSpecific')
         self._save_config_widget('refclock_sock_address')
 
-        # Manual tab
-        self._save_config_widget('leap_seconds')
-
         # Save CLI-only flags to QSettings
         self._save_qset_widget('auto_mode')
         self._save_qset_widget('sync_realtime')
@@ -455,6 +454,7 @@ class Phc2sysConfigDialog(QDialog):
         self._save_qset_widget('source_device')
         self._save_qset_widget('sink_device')
         self._save_qset_widget('pps_device')
+        self._save_qset_widget('leap_seconds')
 
         self.config.save()
         self.accept()
@@ -475,7 +475,7 @@ class Phc2sysConfigDialog(QDialog):
             # Reset QSettings CLI flags
             for key in ('auto_mode', 'sync_realtime', 'wait_ptp4l',
                         'summary_updates', 'source_device', 'sink_device',
-                        'pps_device'):
+                        'pps_device', 'leap_seconds'):
                 w, default = self._widgets.get(key, (None, None))
                 if w is not None:
                     self._set_widget_value(w, default)
@@ -510,6 +510,15 @@ class Phc2sysConfigDialog(QDialog):
                 cli_flags.extend(['-d', pps])
 
         cli_flags.append('-m')
+
+        # Pass -O (leap_seconds) from QSettings as CLI argument
+        leap = self._qset.value('leap_seconds', '', type=str)
+        if leap:
+            try:
+                leap_val = int(leap)
+                cli_flags.extend(['-O', str(leap_val)])
+            except ValueError:
+                pass
 
         # Pass -z (uds_address) from config if explicitly set
         uds = self.config.get('uds_address')

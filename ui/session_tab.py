@@ -425,7 +425,7 @@ class SessionTab(QWidget):
             return
 
         offset = getattr(self.ptp, '_phc2sys_offset', None)
-        if offset is not None and offset <= 50:
+        if offset is not None and offset <= 500000:
             self._start_aes67()
         elif offset is not None:
             self.session_state_label.setText(
@@ -516,10 +516,10 @@ class SessionTab(QWidget):
         # phc2sys Health ampel
         phc2sys_offset = getattr(self.ptp, '_phc2sys_offset', None)
         if phc2sys_running and phc2sys_offset is not None:
-            if phc2sys_offset <= 10:
+            if phc2sys_offset <= 50000:
                 phc2sys_color = '#4caf50'
                 phc2sys_health = f'OK ({phc2sys_offset}ns)'
-            elif phc2sys_offset <= 50:
+            elif phc2sys_offset <= 500000:
                 phc2sys_color = '#ffc107'
                 phc2sys_health = f'{phc2sys_offset}ns'
             else:

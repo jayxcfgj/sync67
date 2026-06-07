@@ -686,14 +686,14 @@ class PTPTab(QWidget):
             color = 'gray'
             label = '\u2014'
             tip = 'phc2sys Status: waiting for offset data'
-        elif offset <= 10:
+        elif offset <= 50000:
             color = '#4caf50'
             label = f'{offset} ns'
-            tip = f'phc2sys offset: {offset}ns (excellent)'
-        elif offset <= 50:
+            tip = f'phc2sys offset: {offset}ns (stable)'
+        elif offset <= 500000:
             color = '#ffc107'
             label = f'{offset} ns'
-            tip = f'phc2sys offset: {offset}ns (okay)'
+            tip = f'phc2sys offset: {offset}ns (elevated)'
         else:
             color = '#f44336'
             label = f'{offset} ns'
