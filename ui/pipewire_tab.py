@@ -364,21 +364,37 @@ class PipeWireTab(QWidget):
 
     @property
     def aes67_dsp(self):
-        driver = None
-        total_busy = 0.0
+        aes67_nodes = []
         for n in self._last_nodes:
             name = n.get('name', '').lower()
             if 'rtp' not in name and 'aes67' not in name and 'ptp' not in name:
                 continue
-            total_busy += self._to_us(n.get('busy', '---'))
-            if not n.get('is_child') and 'ptp' in name:
+            aes67_nodes.append(n)
+
+        if not aes67_nodes:
+            return 0.0
+
+        total_busy = sum(self._to_us(n.get('busy', '---')) for n in aes67_nodes)
+
+        # PTP-driver-basierte Berechnung (wenn vorhanden)
+        driver = None
+        for n in aes67_nodes:
+            if not n.get('is_child') and 'ptp' in n.get('name', '').lower():
                 driver = n
-        if driver is None:
+                break
+        if driver is not None:
+            cycle = self._to_us(driver.get('waiting', '---')) + self._to_us(driver.get('busy', '---'))
+            if cycle > 0:
+                dsp = total_busy / cycle * 100
+                if dsp <= 100:
+                    return dsp
+
+        # Fallback: Summen-basiert (wie _update_status)
+        total_wait = sum(self._to_us(n.get('waiting', '---')) for n in aes67_nodes)
+        denom = total_wait + total_busy
+        if denom == 0:
             return 0.0
-        cycle = self._to_us(driver.get('waiting', '---')) + self._to_us(driver.get('busy', '---'))
-        if cycle == 0:
-            return 0.0
-        return total_busy / cycle * 100
+        return total_busy / denom * 100
 
     def _update_all(self):
         self._refresh_rate()
