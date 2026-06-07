@@ -393,11 +393,12 @@ class Phc2sysConfigDialog(QDialog):
         self._load_qset_widget('source_device')
         self._add_row(lo, 'Source device (-s)', self._widgets['source_device'][0], src_choices[0])
 
-        all_sinks = ['CLOCK_REALTIME'] + phc_devices
+        all_sinks = ['CLOCK_REALTIME', 'CLOCK_TAI'] + phc_devices
         self._reg('sink_device', QComboBox(), 'CLOCK_REALTIME',
                   choices=all_sinks,
                   tooltip='Sink clock device (-c).\n'
-                          'Default: CLOCK_REALTIME (system clock).')
+                          'Default: CLOCK_REALTIME (system clock).\n'
+                          'CLOCK_TAI = dedicated PTP clock (needs -rr).')
         self._load_qset_widget('sink_device')
         self._add_row(lo, 'Sink device (-c)', self._widgets['sink_device'][0], 'CLOCK_REALTIME')
 
