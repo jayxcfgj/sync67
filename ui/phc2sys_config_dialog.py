@@ -488,8 +488,8 @@ class Phc2sysConfigDialog(QDialog):
         """Build phc2sys command: -f config + CLI-only flags."""
 
         auto = self._qset.value('auto_mode', True, type=bool)
+        sync_r = self._qset.value('sync_realtime', 'single (-r)', type=str)
         if auto:
-            sync_r = self._qset.value('sync_realtime', 'single (-r)', type=str)
             if sync_r == 'double (-rr)':
                 cli_flags = ['-a', '-rr']
             elif sync_r == 'single (-r)':
@@ -510,6 +510,10 @@ class Phc2sysConfigDialog(QDialog):
             pps = self._qset.value('pps_device', '', type=str)
             if pps:
                 cli_flags.extend(['-d', pps])
+            if sync_r == 'double (-rr)':
+                cli_flags.append('-rr')
+            elif sync_r == 'single (-r)':
+                cli_flags.append('-r')
 
         cli_flags.append('-m')
 
