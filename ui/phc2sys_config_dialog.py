@@ -250,8 +250,9 @@ class Phc2sysConfigDialog(QDialog):
 
         self._reg('sync_realtime', QComboBox(), 'single (-r)',
                   choices=['off', 'single (-r)', 'double (-rr)'],
-                  tooltip='-r: synchronize system clock to PHC.\n'
-                          '-rr: also consider system clock as time source.')
+                  tooltip='-r: synchronize system clock (CLOCK_REALTIME) to PHC.\n'
+                          '-rr: additionally sync CLOCK_TAI\n'
+                          '     (needed when pipewire-aes67 uses clock.id = "tai").')
         self._load_qset_widget('sync_realtime')
         self._add_row(lo, 'Sync system clock', self._widgets['sync_realtime'][0], 'single (-r)')
 
@@ -393,12 +394,12 @@ class Phc2sysConfigDialog(QDialog):
         self._load_qset_widget('source_device')
         self._add_row(lo, 'Source device (-s)', self._widgets['source_device'][0], src_choices[0])
 
-        all_sinks = ['CLOCK_REALTIME', 'CLOCK_TAI'] + phc_devices
+        all_sinks = ['CLOCK_REALTIME'] + phc_devices
         self._reg('sink_device', QComboBox(), 'CLOCK_REALTIME',
                   choices=all_sinks,
                   tooltip='Sink clock device (-c).\n'
                           'Default: CLOCK_REALTIME (system clock).\n'
-                          'CLOCK_TAI = dedicated PTP clock (needs -rr).')
+                          'CLOCK_TAI is NOT supported here – use double -rr instead.')
         self._load_qset_widget('sink_device')
         self._add_row(lo, 'Sink device (-c)', self._widgets['sink_device'][0], 'CLOCK_REALTIME')
 
