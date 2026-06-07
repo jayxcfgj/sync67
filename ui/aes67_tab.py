@@ -76,6 +76,27 @@ class AES67Tab(QWidget):
                 self.config._loaded_path = self.config_path
             except (ConfigParseError, FileNotFoundError):
                 self.config = None
+        self._update_node_names()
+
+    def _update_node_names(self):
+        """Read configured PipeWire node names from the AES67 config
+        and send them to the PipeWire tab for pw-dump matching."""
+        names = set()
+        cfg = self.config
+        if cfg is not None:
+            # PTP driver node.name (context.objects[0].args.node.name)
+            ptp_name = cfg.get('context.objects', 0, 'args', 'node.name')
+            if ptp_name:
+                names.add(str(ptp_name))
+            # rtp-sink node names (multiple instances)
+            mods = cfg._data.get('context.modules', [])
+            for i, mod in enumerate(mods):
+                if isinstance(mod, dict) and 'rtp-sink' in mod.get('name', ''):
+                    n = cfg.get('context.modules', i, 'args', 'stream.props', 'node.name')
+                    if n:
+                        names.add(str(n))
+        if self.pipewire_tab is not None:
+            self.pipewire_tab.set_aes67_node_names(names)
 
     def init_ui(self):
         scroll = QScrollArea()

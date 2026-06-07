@@ -1,5 +1,6 @@
 """PipeWire Tab – Sample Rate, Quantum, pw-top Node-Tabelle mit Tree-Struktur."""
 
+import json
 import re
 import os
 import pwd
@@ -48,6 +49,7 @@ class PipeWireTab(QWidget):
         self._current_rate = 0
         self._current_quantum = 0
         self._last_nodes = []
+        self._aes67_node_names = set()
         self.init_ui()
         self._timer.start(2000)
         QTimer.singleShot(300, self._update_all)
@@ -362,14 +364,80 @@ class PipeWireTab(QWidget):
 
     # ─── pw-top ──────────────────────────────────────────────
 
+    def set_aes67_node_names(self, names):
+        """Set the set of configured PipeWire node names for AES67 nodes.
+        
+        Called by AES67Tab when the config is loaded or changed.
+        These names are used as an additional match criterion in
+        _get_aes67_node_ids() for nodes that don't have device.api=aes67
+        (e.g. the PTP0-Driver node).
+        """
+        self._aes67_node_names = set(names) if names else set()
+
+    def _get_aes67_node_ids(self):
+        """Use pw-dump to find node IDs belonging to pipewire-aes67.
+        
+        Strategy (most reliable first):
+          1. device.api = aes67 (set on rtp-sap + rtp-sink nodes,
+             hardcoded in pipewire-aes67.conf, not user-configurable)
+          2. factory.name = support.node.driver + node.group = pipewire.ptp0
+             (identifies the PTP0-Driver clock node)
+          3. node.name matches one of the configured names in self._aes67_node_names
+             (set from the actual config values)
+
+        Returns a set of node ID strings suitable for cross-referencing
+        with pw-top's ID column.
+        """
+        out = self._run(['pw-dump'])
+        if not out:
+            return set()
+        try:
+            data = json.loads(out)
+        except (json.JSONDecodeError, ValueError):
+            return set()
+
+        known_names = {n.lower() for n in self._aes67_node_names if n}
+
+        ids = set()
+        for obj in data:
+            if obj.get('type') != 'PipeWire:Interface:Node':
+                continue
+            props = obj.get('info', {}).get('props', {})
+            oid = str(obj.get('id', ''))
+
+            # 1. device.api = aes67 (most reliable)
+            if props.get('device.api') == 'aes67':
+                ids.add(oid)
+                continue
+
+            # 2. PTP driver: support.node.driver + pipewire.ptp0 group
+            if props.get('factory.name') == 'support.node.driver' and \
+               props.get('node.group') == 'pipewire.ptp0':
+                ids.add(oid)
+                continue
+
+            # 3. Configured node name
+            if known_names and props.get('node.name', '').lower() in known_names:
+                ids.add(oid)
+
+        return ids
+
     @property
     def aes67_dsp(self):
+        if not self._last_nodes:
+            return 0.0
+
+        aes67_ids = self._get_aes67_node_ids()
+
         aes67_nodes = []
         for n in self._last_nodes:
+            nid = n.get('id', '')
             name = n.get('name', '').lower()
-            if 'rtp' not in name and 'aes67' not in name and 'ptp' not in name:
-                continue
-            aes67_nodes.append(n)
+            # Match by: pw-dump ID (reliable) or name patterns (fallback)
+            if nid in aes67_ids:
+                aes67_nodes.append(n)
+            elif any(p in name for p in ('rtp', 'aes67', 'ptp', 'sap', 'sink')):
+                aes67_nodes.append(n)
 
         if not aes67_nodes:
             return 0.0
