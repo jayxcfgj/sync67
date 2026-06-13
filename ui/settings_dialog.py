@@ -7,7 +7,7 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("PTP Start Options")
-        self.setMinimumSize(300, 200)
+        self.setMinimumSize(450, 500)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
         self.init_ui()
         self.load_settings()
