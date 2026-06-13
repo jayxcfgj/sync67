@@ -349,6 +349,17 @@ class PTPTab(QWidget):
             wol_d = settings.value("wol_d", True, type=bool)
 
             commands = []
+
+            # System clock services (stopped BEFORE PTP starts)
+            if settings.value("stop_timesyncd", True, type=bool):
+                commands.append("sudo systemctl stop systemd-timesyncd")
+            if settings.value("stop_chronyd", True, type=bool):
+                commands.append("sudo systemctl stop chronyd")
+            if settings.value("stop_ntpd", True, type=bool):
+                commands.append("sudo systemctl stop ntp")
+            if settings.value("stop_sys_time_wait", True, type=bool):
+                commands.append("sudo systemctl stop systemd-time-wait-sync")
+
             if phc_reset:
                 phc_dev = self._get_phc_device(iface)
                 if phc_dev:

@@ -92,6 +92,55 @@ class SettingsDialog(QDialog):
 
         settings_group.setLayout(settings_layout)
         content_layout.addWidget(settings_group)
+
+        # ── System Clock Services ──────────────────────────────────
+        services_group = QGroupBox("System Clock Services (stopped during PTP use, NOT restarted after stop)")
+        services_layout = QFormLayout()
+
+        self.timesyncd_check = QCheckBox("Stop systemd-timesyncd")
+        self.timesyncd_check.setToolTip(
+            "Stops systemd-timesyncd (NTP client).\n"
+            "Competes with phc2sys for CLOCK_REALTIME.\n"
+            "Note: Service is NOT automatically restarted when PTP stops.\n"
+            "It will be available again after reboot."
+        )
+        self.timesyncd_check.setChecked(True)
+
+        self.chronyd_check = QCheckBox("Stop chronyd")
+        self.chronyd_check.setToolTip(
+            "Stops chronyd (NTP client).\n"
+            "Alternative to systemd-timesyncd. Can step or slew CLOCK_REALTIME.\n"
+            "Note: Service is NOT automatically restarted when PTP stops.\n"
+            "It will be available again after reboot."
+        )
+        self.chronyd_check.setChecked(True)
+
+        self.ntpd_check = QCheckBox("Stop ntpd")
+        self.ntpd_check.setToolTip(
+            "Stops ntpd (NTP daemon).\n"
+            "Classic NTP implementation. Can step CLOCK_REALTIME.\n"
+            "Note: Service is NOT automatically restarted when PTP stops.\n"
+            "It will be available again after reboot."
+        )
+        self.ntpd_check.setChecked(True)
+
+        self.sys_time_wait_check = QCheckBox("Stop systemd-time-wait-sync")
+        self.sys_time_wait_check.setToolTip(
+            "Stops systemd-time-wait-sync.\n"
+            "Waits for initial clock sync at boot. Can apply\n"
+            "a one-time step to CLOCK_REALTIME.\n"
+            "Note: Service is NOT automatically restarted when PTP stops.\n"
+            "It will be available again after reboot."
+        )
+        self.sys_time_wait_check.setChecked(True)
+
+        services_layout.addRow(self.timesyncd_check)
+        services_layout.addRow(self.chronyd_check)
+        services_layout.addRow(self.ntpd_check)
+        services_layout.addRow(self.sys_time_wait_check)
+
+        services_group.setLayout(services_layout)
+        content_layout.addWidget(services_group)
         content_layout.addStretch()
 
         scroll.setWidget(content)
@@ -129,6 +178,10 @@ class SettingsDialog(QDialog):
         settings.setValue("mcast_event", self.mcast_event_check.isChecked())
         settings.setValue("mcast_pdelay", self.mcast_pdelay_check.isChecked())
         settings.setValue("wol_d", self.wol_check.isChecked())
+        settings.setValue("stop_timesyncd", self.timesyncd_check.isChecked())
+        settings.setValue("stop_chronyd", self.chronyd_check.isChecked())
+        settings.setValue("stop_ntpd", self.ntpd_check.isChecked())
+        settings.setValue("stop_sys_time_wait", self.sys_time_wait_check.isChecked())
 
     def load_settings(self):
         """Load checkbox states from settings"""
@@ -143,3 +196,7 @@ class SettingsDialog(QDialog):
         self.mcast_event_check.setChecked(settings.value("mcast_event", True, type=bool))
         self.mcast_pdelay_check.setChecked(settings.value("mcast_pdelay", True, type=bool))
         self.wol_check.setChecked(settings.value("wol_d", True, type=bool))
+        self.timesyncd_check.setChecked(settings.value("stop_timesyncd", True, type=bool))
+        self.chronyd_check.setChecked(settings.value("stop_chronyd", True, type=bool))
+        self.ntpd_check.setChecked(settings.value("stop_ntpd", True, type=bool))
+        self.sys_time_wait_check.setChecked(settings.value("stop_sys_time_wait", True, type=bool))
