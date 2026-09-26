@@ -229,6 +229,7 @@ class PTP4LConfigDialog(QDialog):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
+        self.containers = {}
         self.tabs = QTabWidget()
         tab_style = """
             QTabWidget::pane { background-color: #2b2b2b; border: 1px solid #555; }
@@ -246,6 +247,13 @@ class PTP4LConfigDialog(QDialog):
         for section in SECTION_ORDER:
             self._create_tab(section, tab_names.get(section, section))
         self._create_other_tab()
+
+        # PI parameters only relevant when clock_servo = pi
+        if 'clock_servo' in self.widgets:
+            cw = self.widgets['clock_servo']
+            if isinstance(cw.widget, QComboBox):
+                cw.widget.currentIndexChanged.connect(self._update_pi_param_states)
+        self._update_pi_param_states()
 
         self._has_changes = False  # initial loading should not mark as changed
 
@@ -291,6 +299,7 @@ class PTP4LConfigDialog(QDialog):
             val = self.config.get(pdef.key)
             container, pw = create_widget(pdef, val, on_change=self._mark_changes)
             self.widgets[pdef.key] = pw
+            self.containers[pdef.key] = container
 
             supported = self.config._supported is None or pdef.key in self.config._supported
             if not supported:
@@ -452,9 +461,36 @@ class PTP4LConfigDialog(QDialog):
     def _mark_changes(self):
         self._has_changes = True
 
+    # PI-Parameter nur beim pi-Servo aktiv
+    _PI_KEYS = (
+        'pi_proportional_const', 'pi_integral_const',
+        'pi_proportional_scale', 'pi_proportional_exponent',
+        'pi_proportional_norm_max', 'pi_integral_scale',
+        'pi_integral_exponent', 'pi_integral_norm_max',
+    )
+
+    def _update_pi_param_states(self, *args):
+        """Graut PI-Servo-Parameter aus, wenn clock_servo != pi."""
+        servo = self.widgets.get('clock_servo')
+        if servo is None:
+            return
+        is_pi = servo.get_value() == 'pi'
+        for key in self._PI_KEYS:
+            container = self.containers.get(key)
+            if container is None:
+                continue
+            container.setEnabled(is_pi)
+            label = container.layout().itemAt(0).widget() if container.layout() else None
+            if isinstance(label, QLabel):
+                if is_pi:
+                    label.setText(label.text().replace(' (n/a with linreg)', ''))
+                elif '(n/a' not in label.text():
+                    label.setText(f"{label.text()} (n/a with linreg)")
+
     def _reload_widgets(self):
         for key, pw in self.widgets.items():
             val = self.config.get(key)
             if val is not None:
                 pw.set_value(val)
+        self._update_pi_param_states()
         self._has_changes = False
