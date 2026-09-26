@@ -475,17 +475,33 @@ class PTP4LConfigDialog(QDialog):
         if servo is None:
             return
         is_pi = servo.get_value() == 'pi'
+        disabled_style = 'color: #666; background-color: #2b2b2b; border-left: 3px solid #444;'
+        default_disabled = 'color: #555; font-size: 10px;'
         for key in self._PI_KEYS:
             container = self.containers.get(key)
             if container is None:
                 continue
             container.setEnabled(is_pi)
+            pw = self.widgets.get(key)
             label = container.layout().itemAt(0).widget() if container.layout() else None
-            if isinstance(label, QLabel):
-                if is_pi:
+            default_lbl = pw.default_label if pw is not None else None
+            if is_pi:
+                if isinstance(label, QLabel):
                     label.setText(label.text().replace(' (n/a with linreg)', ''))
-                elif '(n/a' not in label.text():
-                    label.setText(f"{label.text()} (n/a with linreg)")
+                    label.setStyleSheet('')
+                if pw is not None:
+                    pw.widget.setStyleSheet('')
+                if isinstance(default_lbl, QLabel):
+                    default_lbl.setStyleSheet('color: gray; font-size: 10px;')
+            else:
+                if isinstance(label, QLabel):
+                    if '(n/a' not in label.text():
+                        label.setText(f"{label.text()} (n/a with linreg)")
+                    label.setStyleSheet('color: #666;')
+                if pw is not None:
+                    pw.widget.setStyleSheet(disabled_style)
+                if isinstance(default_lbl, QLabel):
+                    default_lbl.setStyleSheet(default_disabled)
 
     def _reload_widgets(self):
         for key, pw in self.widgets.items():
