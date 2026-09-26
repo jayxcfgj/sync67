@@ -68,7 +68,7 @@ CONFIG_PARAMS = [
              section='Quick'),
     ParamDef('logSyncInterval', 'choice', 0,
              label='Sync Interval',
-             tooltip='Interval of sync messages.\nValue = log2(interval in seconds).\n0 = 1 Hz (1 s), -3 = 128 Hz.',
+             tooltip='Interval of sync messages.\nValue = log2(interval in seconds).\n0 = 1 Hz (1 s), -1 = 2 Hz (0.5 s).\nUse -1 for better RMS (requires master support,\ne.g. Dante).',
              section='Quick',
              choices=[-3, -2, -1, 0, 1, 2, 3, 4]),
     ParamDef('logMinDelayReqInterval', 'choice', 0,
@@ -364,25 +364,30 @@ CONFIG_PARAMS = [
              label='PI Integral Norm Max',
              tooltip='Maximum normalization of the integral component.',
              section='Servo', min_val=0.0, max_val=10.0),
-    ParamDef('step_threshold', 'float', 0.0,
+    ParamDef('step_threshold', 'float', 1.0,
              label='Step Threshold',
              tooltip='Threshold for clock steps in seconds.\n'
-                     '0.0 = always allow steps.',
+                     'If offset > threshold, clock is stepped (jumped).\n'
+                     '0.0 = never step after initial step (always slew).\n'
+                     '1.0 = step when offset > 1s (fast convergence).',
              section='Servo', min_val=0.0, max_val=1.0),
-    ParamDef('first_step_threshold', 'float', 0.00002,
+    ParamDef('first_step_threshold', 'float', 1.0,
              label='First Step Threshold',
-             tooltip='Threshold for first clock step (20 µs).\n'
-                     'Larger value = larger first step.',
+             tooltip='Offset threshold for the first clock step in seconds.\n'
+                     'If initial offset > threshold, clock is stepped immediately.\n'
+                     '0.00002 = step at >20µs (linuxptp default).\n'
+                     '1.0 = step only at >1s (large offsets e.g. from other masters).',
              section='Servo', min_val=0.0, max_val=1.0),
     ParamDef('max_frequency', 'int', 900000000,
              label='Max Frequency Adjustment',
              tooltip='Maximum frequency adjustment in ppb.\n'
                      '900000000 = ±900 ppm.',
              section='Servo', min_val=0, max_val=1000000000),
-    ParamDef('clock_servo', 'choice', 'pi',
+    ParamDef('clock_servo', 'choice', 'linreg',
              label='Clock Servo',
-             tooltip='Controller algorithm:\npi = PI controller (default)\n'
-                     'linreg = Linear regression\nnull = no correction.',
+             tooltip='Controller algorithm:\nlinreg = Linear regression (adaptive, recommended)\n'
+                     'pi = PI controller (classic, needs tuning)\n'
+                     'null = no correction.',
              section='Servo',
              choices=['pi', 'linreg', 'null']),
     ParamDef('sanity_freq_limit', 'int', 200000000,
