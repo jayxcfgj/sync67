@@ -10,8 +10,8 @@ from PyQt6.QtCore import Qt, QSettings
 
 import os
 
-from core.phc2sys_config import Phc2sysConfig, CONFIG_PATH
-from core.phc2sys_config_meta import BUILTIN_DEFAULTS
+from core.phc2sys_config import Phc2sysConfig, Phc2sysConfigError, CONFIG_PATH
+from core.phc2sys_config_meta import CLI_DEFAULTS, default_for
 
 
 _PHC_CACHE = None
@@ -53,7 +53,7 @@ class Phc2sysConfigDialog(QDialog):
         return f'Default: {default}' if default != '' else 'Default: (empty)'
 
     def _config_default(self, key):
-        return BUILTIN_DEFAULTS.get(key, 0)
+        return default_for(key)
 
     def _make_scroll(self, layout):
         scroll = QScrollArea()
@@ -240,29 +240,33 @@ class Phc2sysConfigDialog(QDialog):
         lo.setSpacing(2)
 
         # CLI-only params (no enable checkbox, stored in QSettings)
-        self._reg('auto_mode', QCheckBox(), True,
+        self._reg('auto_mode', QCheckBox(), CLI_DEFAULTS['auto_mode'],
                   label='Auto mode (-a)',
                   tooltip='Automatically read clocks from running ptp4l\n'
                           'and follow port state changes.\n'
                           'When OFF, manual source/sink must be configured.')
         self._load_qset_widget('auto_mode')
-        self._add_row(lo, 'Auto mode (-a)', self._widgets['auto_mode'][0], True)
+        self._add_row(lo, 'Auto mode (-a)', self._widgets['auto_mode'][0],
+                      CLI_DEFAULTS['auto_mode'])
 
-        self._reg('sync_realtime', QComboBox(), 'single (-r)',
+        self._reg('sync_realtime', QComboBox(), CLI_DEFAULTS['sync_realtime'],
                   choices=['off', 'single (-r)', 'double (-rr)'],
                   tooltip='-r: synchronize system clock (CLOCK_REALTIME) to PHC.\n'
                           '-rr: additionally sync CLOCK_TAI\n'
                           '     (needed when pipewire-aes67 uses clock.id = "tai").')
         self._load_qset_widget('sync_realtime')
-        self._add_row(lo, 'Sync system clock', self._widgets['sync_realtime'][0], 'single (-r)')
+        self._add_row(lo, 'Sync system clock',
+                      self._widgets['sync_realtime'][0],
+                      CLI_DEFAULTS['sync_realtime'])
 
-        self._reg('wait_ptp4l', QCheckBox(), True,
+        self._reg('wait_ptp4l', QCheckBox(), CLI_DEFAULTS['wait_ptp4l'],
                   label='Wait for ptp4l (-w)',
                   tooltip='Wait until ptp4l is synchronized.\n'
                           'Auto-learns UTC offset from ptp4l.\n'
                           'Only in manual mode.')
         self._load_qset_widget('wait_ptp4l')
-        self._add_row(lo, 'Wait for ptp4l (-w)', self._widgets['wait_ptp4l'][0], True)
+        self._add_row(lo, 'Wait for ptp4l (-w)', self._widgets['wait_ptp4l'][0],
+                      CLI_DEFAULTS['wait_ptp4l'])
 
         # Config param: update_interval
         self._make_config_row(lo, 'update_interval', 'Update interval (s)',
@@ -294,17 +298,21 @@ class Phc2sysConfigDialog(QDialog):
                               tooltip='Integral gain (-I).')
 
         self._make_config_row(lo, 'step_threshold', 'Step threshold (s)',
-                              QLineEdit(), 0.0, minv=None,
+                              QLineEdit(), default_for('step_threshold'),
+                              minv=None,
                               tooltip='Step threshold in seconds (-S).\n'
                                       '0.0 = no stepping after startup.')
 
-        self._make_config_row(lo, 'first_step_threshold', 'First step threshold (s)',
-                              QLineEdit(), 0.00002, minv=None,
+        self._make_config_row(lo, 'first_step_threshold',
+                              'First step threshold (s)',
+                              QLineEdit(), default_for('first_step_threshold'),
+                              minv=None,
                               tooltip='First step threshold in seconds (-F).\n'
-                                      'Default: 0.00002 (20 \u00b5s).')
+                                      'sync67 default: 1 (s).')
 
         self._make_config_row(lo, 'sanity_freq_limit', 'Sanity freq limit (ppb)',
-                              QLineEdit(), 200000000, minv=None,
+                              QLineEdit(), default_for('sanity_freq_limit'),
+                              minv=None,
                               tooltip='Sanity frequency limit in ppb (-L).')
 
         self._make_config_row(lo, 'num_readings', 'Num readings',
@@ -312,11 +320,14 @@ class Phc2sysConfigDialog(QDialog):
                               tooltip='Number of PHC readings per update (-N).')
 
         # summary_updates is CLI-only
-        self._reg('summary_updates', QSpinBox(), 0,
+        self._reg('summary_updates', QSpinBox(),
+                  CLI_DEFAULTS['summary_updates'],
                   minv=0, maxv=1000, step=1,
                   tooltip='Summary updates (-u). 0 = disabled.')
         self._load_qset_widget('summary_updates')
-        self._add_row(lo, 'Summary updates (-u)', self._widgets['summary_updates'][0], 0)
+        self._add_row(lo, 'Summary updates (-u)',
+                      self._widgets['summary_updates'][0],
+                      CLI_DEFAULTS['summary_updates'])
 
         self._make_config_row(lo, 'ntpshm_segment', 'SHM segment',
                               QLineEdit(), 0, minv=None,
@@ -330,7 +341,7 @@ class Phc2sysConfigDialog(QDialog):
         lo.setSpacing(2)
 
         self._make_config_row(lo, 'uds_address', 'UDS address',
-                              QLineEdit(), '/var/run/ptp4l',
+                              QLineEdit(), default_for('uds_address'),
                               tooltip='UDS address (-z). Must match ptp4l.')
 
         self._make_config_row(lo, 'domainNumber', 'Domain number',
@@ -395,27 +406,30 @@ class Phc2sysConfigDialog(QDialog):
         self._add_row(lo, 'Source device (-s)', self._widgets['source_device'][0], src_choices[0])
 
         all_sinks = ['CLOCK_REALTIME'] + phc_devices
-        self._reg('sink_device', QComboBox(), 'CLOCK_REALTIME',
+        self._reg('sink_device', QComboBox(), CLI_DEFAULTS['sink_device'],
                   choices=all_sinks,
                   tooltip='Sink clock device (-c).\n'
                           'Default: CLOCK_REALTIME (system clock).\n'
                           'CLOCK_TAI is NOT supported here – use double -rr instead.')
         self._load_qset_widget('sink_device')
-        self._add_row(lo, 'Sink device (-c)', self._widgets['sink_device'][0], 'CLOCK_REALTIME')
+        self._add_row(lo, 'Sink device (-c)', self._widgets['sink_device'][0],
+                      CLI_DEFAULTS['sink_device'])
 
-        self._reg('pps_device', QLineEdit(), '',
+        self._reg('pps_device', QLineEdit(), CLI_DEFAULTS['pps_device'],
                   tooltip='PPS device (-d). Leave empty unless using PPS.')
         self._load_qset_widget('pps_device')
-        self._add_row(lo, 'PPS device (-d)', self._widgets['pps_device'][0], '')
+        self._add_row(lo, 'PPS device (-d)', self._widgets['pps_device'][0],
+                      CLI_DEFAULTS['pps_device'])
 
         # Leap seconds (-O) as CLI-only param, not in config file
-        self._reg('leap_seconds', QLineEdit(), '',
+        self._reg('leap_seconds', QLineEdit(), CLI_DEFAULTS['leap_seconds'],
                   tooltip='UTC-TAI offset in seconds (-O).\n'
                           'Currently 37 (as of 2025+).\n'
                           'Set to 0 for auto-learn (when using -w).\n'
                           'Passed as -O <value> on the command line.')
         self._load_qset_widget('leap_seconds', default='')
-        self._add_row(lo, 'Leap seconds (-O)', self._widgets['leap_seconds'][0], '')
+        self._add_row(lo, 'Leap seconds (-O)', self._widgets['leap_seconds'][0],
+                      CLI_DEFAULTS['leap_seconds'])
 
         lo.addStretch()
         self.tabs.addTab(self._make_scroll(lo), 'Manual')
@@ -464,23 +478,32 @@ class Phc2sysConfigDialog(QDialog):
     def _on_reset(self):
         reply = QMessageBox.warning(
             self, 'Reset to Defaults',
-            'Reset all phc2sys parameters to their defaults?\n'
-            'This will clear the config file.',
+            'Restore the sync67 defaults for phc2sys?\n'
+            'Config file goes back to the saved snapshot,\n'
+            'CLI flags to their default values.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        if reply == QMessageBox.StandardButton.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
             self.config.reset_to_default()
-            # Reload all config widgets
-            for key in self._widgets:
-                if key in self._enable_cbs:
-                    self._load_config_widget(key)
-            # Reset QSettings CLI flags
-            for key in ('auto_mode', 'sync_realtime', 'wait_ptp4l',
-                        'summary_updates', 'source_device', 'sink_device',
-                        'pps_device', 'leap_seconds'):
-                w, default = self._widgets.get(key, (None, None))
-                if w is not None:
-                    self._set_widget_value(w, default)
+        except Phc2sysConfigError as e:
+            QMessageBox.warning(self, 'Reset failed', str(e),
+                                QMessageBox.StandardButton.Ok)
+            return
+        # Reload all config widgets
+        for key in self._widgets:
+            if key in self._enable_cbs:
+                self._load_config_widget(key)
+        # CLI-Flags: Widgets UND QSettings sofort auf die Defaults
+        for key in (*CLI_DEFAULTS, 'source_device'):
+            w, wdefault = self._widgets.get(key, (None, None))
+            if w is None:
+                continue
+            default = CLI_DEFAULTS.get(key, wdefault)
+            self._set_widget_value(w, default)
+            if default is not None:
+                self._qset.setValue(key, default)
 
     # ─── Command Builder ──────────────────────────────────────
 

@@ -207,3 +207,26 @@ def get_default(key):
         if p.key == key:
             return p.default
     return BUILTIN_DEFAULTS.get(key)
+
+
+# CLI-only Flags (in QSettings gespeichert) – sync67-Default.
+# source_device fehlt bewusst: dynamisch = erstes PHC-Gerät.
+CLI_DEFAULTS = {
+    'auto_mode': True,
+    'sync_realtime': 'single (-r)',
+    'wait_ptp4l': True,
+    'summary_updates': 0,
+    'sink_device': 'CLOCK_REALTIME',
+    'pps_device': '',
+    'leap_seconds': '',
+}
+
+
+def default_for(key):
+    """Default fuer Labels/Reset: Snapshot-Wert aus
+    core/phc2sys_default.cfg, sonst ParamDef- bzw. LinuxPTP-Builtin."""
+    from .phc2sys_config import read_default_file
+    vals = read_default_file()
+    if key in vals:
+        return vals[key]
+    return get_default(key)
