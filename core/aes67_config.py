@@ -135,6 +135,7 @@ class AES67Config:
         self._raw_lines = []     # list of str (preserved from original)
         self._data = {}          # structured parsed data
         self._line_map = []      # list of (path_tuple, line_idx)
+        self._obj_ranges = {}    # list of [path] -> [(start_line, end_line)]
         self._loaded_path = None
         self._modified = False
 
@@ -629,25 +630,84 @@ class AES67Config:
 
         template = modules[template_index]
         new_mod = deepcopy(template)
-        new_mod['args']['destination.ip'] = '239.69.150.243'
-        new_mod['args']['destination.port'] = 5004
-        new_mod['args']['sess.name'] = '"PipeWire RTP stream"'
-        modules.append(new_mod)
+        self._make_sink_identity(new_mod, modules)
 
-        # Find insertion point in raw_lines
-        # Insert after the closing } of the last module
-        insert_at = self._find_module_line_end(len(modules) - 2)
-        if insert_at is not None:
-            insert_at += 1  # after the closing line
-        else:
-            insert_at = len(self._raw_lines) - 1
+        # The new block must land INSIDE context.modules, i.e. directly in
+        # front of the closing "]" – never at the end of the file.
+        insert_at = self._find_section_close('context.modules')
+        if insert_at is None:
+            return -1
 
         serialized = self._serialize_module(new_mod)
         for line in reversed(serialized):
             self._raw_lines.insert(insert_at, line)
 
+        # re-parse: _data/_line_map/_obj_ranges must know the new module,
+        # otherwise set() silently drops edits and remove() loses lines
+        self._parse()
         self._modified = True
-        return len(modules) - 1
+        return len(self._data.get('context.modules', [])) - 1
+
+    @staticmethod
+    def _unquote(value):
+        return str(value).strip('"') if value is not None else ''
+
+    def _make_sink_identity(self, new_mod, modules):
+        """Unique node.name / sess.name / multicast IP for a copied sink.
+
+        The stock config explicitly asks for this when creating multiple
+        sinks: identical node names collide in PipeWire, identical
+        destination addresses merge two streams into one flow.
+        """
+        existing = [m for m in modules
+                    if isinstance(m, dict)
+                    and m.get('name') == 'libpipewire-module-rtp-sink']
+        args = new_mod.setdefault('args', {})
+        props = args.setdefault('stream.props', {})
+
+        used_names = {self._unquote(
+            (m.get('args', {}).get('stream.props') or {}).get('node.name'))
+            for m in existing}
+        used_sess = {self._unquote(m.get('args', {}).get('sess.name'))
+                     for m in existing}
+        used_ips = {self._unquote(m.get('args', {}).get('destination.ip'))
+                    for m in existing}
+
+        n = 2
+        while f'rtp-sink{n}' in used_names:
+            n += 1
+        props['node.name'] = f'"rtp-sink{n}"'
+
+        m = 2
+        while f'PipeWire RTP stream {m}' in used_sess:
+            m += 1
+        args['sess.name'] = f'"PipeWire RTP stream {m}"'
+
+        # unquoted like the stock config (SPA accepts plain addresses)
+        args['destination.ip'] = self._next_free_ip(
+            args.get('destination.ip'), used_ips)
+        args.setdefault('destination.port', 5004)
+
+    @staticmethod
+    def _next_free_ip(base, used):
+        """First unused multicast address in the same /16 as base.
+
+        AES67 wants administratively scoped 239.x.x.x, Dante-compatible
+        streams sit in 239.69.x.x – the second octet of base is kept.
+        """
+        parts = str(base or '').strip('"').split('.')
+        try:
+            net = (parts[0], parts[1])
+            third_start, fourth_start = int(parts[2]), int(parts[3])
+        except (IndexError, ValueError):
+            net, third_start, fourth_start = ('239', '69'), 150, 243
+        for third in range(third_start, 256):
+            start = fourth_start if third == third_start else 1
+            for fourth in range(start, 255):
+                cand = f'{net[0]}.{net[1]}.{third}.{fourth}'
+                if cand not in used:
+                    return cand
+        return f'{net[0]}.{net[1]}.{third_start}.{fourth_start}'
 
     def remove_rtp_sink(self, index):
         modules = self._data.get('context.modules', [])
@@ -661,13 +721,13 @@ class AES67Config:
         if rtp_count <= 1:
             return False
 
-        # Find line range and remove
         start = self._find_module_line_start(index)
         end = self._find_module_line_end(index)
-        if start is not None and end is not None:
-            del self._raw_lines[start:end + 1]
+        if start is None or end is None:
+            return False
 
-        del modules[index]
+        del self._raw_lines[start:end + 1]
+        self._parse()
         self._modified = True
         return True
 
@@ -738,6 +798,7 @@ class AES67Config:
         """Parse raw_lines into _data and build _line_map."""
         self._data = {}
         self._line_map = []
+        self._obj_ranges = {}
         lines = self._raw_lines
         i = 0
         while i < len(lines):
@@ -874,6 +935,7 @@ class AES67Config:
                     if 'name' in obj or 'factory' in obj:
                         self._line_map.append((f'{parent_path}[{obj_idx}]', i))
                     result.append(obj)
+                    self._record_range(parent_path, i, i)
                     i += 1
                 else:
                     # Multi-line object
@@ -881,14 +943,20 @@ class AES67Config:
                     obj_path = f"{parent_path}[{obj_idx}]"
                     inner, end_idx = self._parse_braced_block(lines, i + 1, obj_path)
                     result.append(inner)
+                    self._record_range(parent_path, i, end_idx)
                     i = end_idx + 1
                 continue
 
             # Simple value
             result.append(parse_value(stripped))
+            self._record_range(parent_path, i, i)
             i += 1
 
         return result, i
+
+    def _record_range(self, parent_path, start, end):
+        """Remember the raw line span of one array entry (index aligned)."""
+        self._obj_ranges.setdefault(parent_path, []).append((start, end))
 
     def _parse_single_line_object(self, text):
         result = {}
@@ -1022,39 +1090,29 @@ class AES67Config:
 
         return None
 
-    def _find_module_line_start(self, index):
-        modules = self._data.get('context.modules', [])
-        if index < 0 or index >= len(modules):
-            return None
-        target_name = modules[index].get('name', '')
-        count = 0
-        depth = 0
-        for idx, line in enumerate(self._raw_lines):
-            stripped = line.strip()
-            if stripped.startswith('{'):
-                depth += 1
-                if depth == 1:
-                    if target_name in stripped:
-                        if count == index:
-                            return idx
-                        count += 1
-            if stripped.startswith('}') or stripped.rstrip(',').startswith('}'):
-                depth -= 1
+    def get_module_range(self, index):
+        """(start_line, end_line) of context.modules[index] as recorded
+        by _parse(). Returns None when unknown."""
+        ranges = self._obj_ranges.get('context.modules', [])
+        if 0 <= index < len(ranges):
+            return ranges[index]
         return None
 
+    def _find_module_line_start(self, index):
+        rng = self.get_module_range(index)
+        return rng[0] if rng else None
+
     def _find_module_line_end(self, index):
-        start = self._find_module_line_start(index)
-        if start is None:
-            return None
-        depth = 0
-        for idx in range(start, len(self._raw_lines)):
-            stripped = self._raw_lines[idx].strip()
-            if stripped.startswith('{'):
-                depth += 1
-            elif stripped.startswith('}') or stripped.rstrip(',').startswith('}'):
-                depth -= 1
-                if depth == 0:
-                    return idx
+        rng = self.get_module_range(index)
+        return rng[1] if rng else None
+
+    def _find_section_close(self, section):
+        """Line index of the ']' closing a top level [ ... ] section."""
+        ranges = self._obj_ranges.get(section, [])
+        start = ranges[-1][1] + 1 if ranges else 0
+        for i in range(start, len(self._raw_lines)):
+            if self._raw_lines[i].strip() == ']':
+                return i
         return None
 
     def _find_sub_block_end(self, section, obj_spec, sub_block='args'):

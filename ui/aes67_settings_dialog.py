@@ -555,6 +555,12 @@ class AES67SettingsDialog(QDialog):
         self._has_changes = False
         self._rules_initial_text = getattr(
             self, '_rules_initial_text', '') or ''
+        issues = self._channel_limit_issues()
+        if issues:
+            QMessageBox.warning(
+                self, 'AES67 Channel Limit',
+                'AES67 allows max. 8 channels per stream:\n'
+                + '\n'.join(issues))
 
     def _apply_dark_theme(self):
         app = QApplication.instance()
@@ -868,8 +874,45 @@ class AES67SettingsDialog(QDialog):
 
     # ── Actions ─────────────────────────────────────────────────
 
+    def _channel_limit_issues(self, check_channels=True):
+        """AES67 allows max. 8 channels per stream.
+
+        channel-names come from the widgets (what Apply would write);
+        audio.channels is read from the config because the spin box
+        silently clamps manual values above 8.
+        """
+        issues = []
+        for n, tab in enumerate(self.rtp_sink_tabs, 1):
+            pw = tab.widgets.get('node.channel-names')
+            if pw is not None:
+                try:
+                    count = len(pw.get_value())
+                except Exception:
+                    count = 0
+                if count > 8:
+                    issues.append(
+                        f"Sink {n}: {count} channel names (max. 8)")
+            if not check_channels:
+                continue
+            try:
+                ch = self.config.get('context.modules', tab.sink_index,
+                                     'args', 'audio.channels')
+                if ch is not None and int(ch) > 8:
+                    issues.append(
+                        f"Sink {n}: audio.channels = {ch} (max. 8)")
+            except Exception:
+                pass
+        return issues
+
     def _on_apply(self):
         try:
+            issues = self._channel_limit_issues(check_channels=False)
+            if issues:
+                QMessageBox.warning(
+                    self, 'AES67 Channel Limit',
+                    'AES67 allows max. 8 channels per stream:\n'
+                    + '\n'.join(issues))
+                return
             # Collect all widget values
             for key, pw in self.widgets.items():
                 pdef = pw.defn

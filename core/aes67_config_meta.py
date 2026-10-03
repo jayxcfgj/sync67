@@ -317,16 +317,18 @@ CONFIG_PARAMS: list[ParamDef] = [
              2,
              label='Channels',
              tooltip='Number of audio channels in the stream.\n'
-                     '2 = Stereo.',
+                     '2 = Stereo.\n'
+                     'AES67 limit: max. 8 channels per stream.',
              section='RTP Sink Output',
-             min_val=1, max_val=64),
+             min_val=1, max_val=8),
     ParamDef('node.channel-names', 'libpipewire-module-rtp-sink',
              ('args', 'node.channel-names'), 'multiline',
              '["CH1", "CH2"]',
              label='Channel Names',
               tooltip='Names of the audio channels.\n'
                       'Visible to AES67 receivers.\n'
-                      'Enter comma-separated values, e.g.: CH1, CH2',
+                      'Enter comma-separated values, e.g.: CH1, CH2\n'
+                      'AES67 limit: max. 8 channels per stream.',
              section='RTP Sink Output'),
 
     # ── stream.props (RTP Sink) ────────────────────────────────
