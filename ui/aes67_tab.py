@@ -433,18 +433,17 @@ class AES67Tab(QWidget):
             bus_address = f"unix:path={runtime_dir}/bus"
 
             if not os.path.exists(self.config_path):
-                if os.path.exists(self.default_config_path):
-                    shutil.copy(self.default_config_path, self.config_path)
+                if self._seed_default_config():
                     self._queue_stdout(
                         "No user config found. Default copied to:\n"
                         f"  {self.config_path}\n"
+                        "sync67 documentation defaults applied.\n"
                     )
                 else:
                     self._queue_stdout(
                         "ERROR: Neither user config nor default config found.\n"
                     )
                     return
-                self._init_config()
 
             use_config = self.config_path
 
@@ -522,11 +521,26 @@ class AES67Tab(QWidget):
                 f"  {self.default_config_path}\n"
             )
 
+    def _seed_default_config(self):
+        """Copy the stock default config and apply sync67 defaults.
+
+        Returns False when no default config is available.
+        """
+        if not os.path.exists(self.default_config_path):
+            return False
+        shutil.copy(self.default_config_path, self.config_path)
+        self._init_config()
+        if self.config is not None:
+            from ui.aes67_settings_dialog import ptp_interface
+            self.config.apply_sync67_defaults(ptp_interface())
+            self.config.save(backup=False)
+        return True
+
     def open_config_editor(self):
         if not os.path.exists(self.config_path):
-            if os.path.exists(self.default_config_path):
-                shutil.copy(self.default_config_path, self.config_path)
-                self._queue_stdout("Default config copied.\n")
+            if self._seed_default_config():
+                self._queue_stdout(
+                    "Default config copied (sync67 defaults applied).\n")
             else:
                 self._queue_stdout("No config found.\n")
                 return

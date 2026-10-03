@@ -74,21 +74,21 @@ CONFIG_PARAMS: list[ParamDef] = [
              min_val=0, max_val=1000000, step=1000),
     ParamDef('resync.ms', 'context.objects',
              ('args', 'resync.ms'), 'float',
-             1.5,
+             48,
              label='Resync Interval (ms)',
              tooltip='Interval in ms after which a re-synchronization\n'
                      'of the clock is forced.\n'
-                     'Lower = more frequent resyncs.',
+                     'sync67 recommendation: 48 (together with max_resync = 4).',
              section='PTP Clock',
-             min_val=0.1, max_val=60.0, step=0.1),
+             min_val=0.1, max_val=600.0, step=0.1),
     ParamDef('max_resync', 'context.objects',
              ('args', 'max_resync'), 'int',
-             48,
+             4,
              label='Max Resync Error (µs)',
              tooltip='Maximum allowed PHC error before a clock reset is triggered.\n'
                      'If the error after resync exceeds this value, the driver resets.\n'
-                     'Increase for imprecise PHCs (e.g. USB adapters).\n'
-                     'Default: 48µs (PipeWire internal).',
+                     'sync67 recommendation: 4µs (short freeze).\n'
+                     'Increase for imprecise PHCs (e.g. USB adapters: 200+).',
              section='PTP Clock',
              min_val=1, max_val=10000, step=10),
     ParamDef('object.export', 'context.objects',
@@ -176,10 +176,12 @@ CONFIG_PARAMS: list[ParamDef] = [
                      'Must match uds_ro_address in ptp4l.conf.',
              section='RTP SAP Input'),
     ParamDef('sap.sess.latency.msec', 'libpipewire-module-rtp-sap',
-             ('args', 'sess.latency.msec'), 'int',
-             3,
+             ('args', 'stream.rules', 0, 'actions', 'create-stream',
+              'sess.latency.msec'), 'int',
+             12,
              label='SAP Latency (ms)',
              tooltip='Latency buffer for received AES67 streams in ms.\n'
+                     'sync67 recommendation: 12.\n'
                      'Integer values only. Lower = less latency but more risky.',
              section='RTP SAP Input',
              min_val=1, max_val=100),
@@ -235,15 +237,18 @@ CONFIG_PARAMS: list[ParamDef] = [
              1,
              label='Min Packet-Time (ms)',
              tooltip='Minimum packet duration in ms.\n'
-                     'Should equal max-ptime.',
+                     'Goes into the SDP (ptime:1).\n'
+                     'sync67 recommendation: 1 (max compatibility).\n'
+                     'max-ptime may be higher (e.g. 4) for stability.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
     ParamDef('sess.max-ptime', 'libpipewire-module-rtp-sink',
              ('args', 'sess.max-ptime'), 'int',
-             1,
+             4,
              label='Max Packet-Time (ms)',
              tooltip='Maximum packet duration in ms.\n'
-                     '1 ms works with most devices.',
+                     'sync67 recommendation: 4 (stable, avoids 1ms scheduling issues).\n'
+                     'sess.latency.msec must be a multiple of this value.',
              section='RTP Sink Output',
              min_val=1, max_val=100),
     ParamDef('sess.name', 'libpipewire-module-rtp-sink',
@@ -282,9 +287,11 @@ CONFIG_PARAMS: list[ParamDef] = [
              section='RTP Sink Output'),
     ParamDef('sink.sess.latency.msec', 'libpipewire-module-rtp-sink',
              ('args', 'sess.latency.msec'), 'int',
-             3,
+             12,
              label='Sink Latency (ms)',
              tooltip='Latency buffer for the outgoing AES67 stream in ms.\n'
+                     'sync67 recommendation: 12.\n'
+                     'Must be a multiple of sess.max-ptime (12/4 = 3).\n'
                      'Integer values only.',
              section='RTP Sink Output',
              min_val=1, max_val=100),

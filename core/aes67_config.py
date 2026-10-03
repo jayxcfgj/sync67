@@ -110,6 +110,24 @@ def format_value(value):
     return val
 
 
+def _join_path(prefix, keys):
+    """Join a key tuple into _line_map path notation.
+
+    Integer keys become '[i]' (list indices), string keys are
+    dot-separated: ('args', 'stream.rules', 0, 'actions')
+    -> 'args.stream.rules[0].actions'
+    """
+    out = prefix
+    for k in keys:
+        if isinstance(k, int):
+            out += f'[{k}]'
+        elif out:
+            out += '.' + str(k)
+        else:
+            out = str(k)
+    return out
+
+
 class AES67Config:
     def __init__(self):
         self.default_path = "/usr/share/pipewire/pipewire-aes67.conf"
@@ -140,12 +158,12 @@ class AES67Config:
                 f"Could not parse any sections in {self._loaded_path}"
             )
 
-    def save(self, path=None):
+    def save(self, path=None, backup=True):
         path = str(path or self._loaded_path)
         if not path:
             raise ConfigWriteError("No path specified")
         try:
-            if os.path.exists(path):
+            if backup and os.path.exists(path):
                 shutil.copy(path, path + '.bak')
         except OSError:
             pass  # non-critical, continue saving
@@ -219,7 +237,8 @@ class AES67Config:
 
         is_new = leaf_key not in parent
         if not is_new and parent[leaf_key] == value:
-            return False
+            # already in the desired state – not an error
+            return True
 
         parent[leaf_key] = value
 
@@ -230,13 +249,15 @@ class AES67Config:
             m = _KV_RE.match(old_line)
             if m:
                 indent = m.group('indent')
-                new_line = f"{indent}{leaf_key} = {format_value(value)}"
+                new_line = (f"{indent}{leaf_key} = "
+                            f"{self._format_like(m.group('value'), value)}")
                 self._raw_lines[line_idx] = new_line
             else:
                 m2 = _INLINE_ARRAY_RE.match(old_line)
                 if m2:
                     indent = m2.group('indent')
-                    new_line = f"{indent}{leaf_key} = {format_value(value)}"
+                    new_line = (f"{indent}{leaf_key} = "
+                                f"{self._format_like(m2.group('values'), value)}")
                     self._raw_lines[line_idx] = new_line
         elif is_new and len(keys) >= 3:
             # Key didn't exist in raw_lines – insert it inside the args block
@@ -269,8 +290,20 @@ class AES67Config:
                             break
                     new_line = f"{indent}{leaf_key} = {format_value(value)}"
                     self._raw_lines.insert(insert_at, new_line)
+                    # keep _line_map in sync – otherwise later
+                    # comment_key/uncomment_key hit shifted lines
+                    self._parse()
         self._modified = True
         return True
+
+    @staticmethod
+    def _format_like(old_raw, value):
+        """format_value(), but keep the quoting style of the existing line."""
+        formatted = format_value(value)
+        if (old_raw or '').strip().startswith('"') \
+                and not formatted.startswith('"'):
+            formatted = '"' + formatted + '"'
+        return formatted
 
     def _find_line_idx_raw(self, keys):
         """Find raw line index for key path, including commented lines.
@@ -369,6 +402,8 @@ class AES67Config:
             return False
         line_idx = self._find_line_idx(keys)
         if line_idx is None:
+            line_idx = self._find_line_idx_raw(keys)
+        if line_idx is None:
             return False
         line = self._raw_lines[line_idx]
         stripped = line.strip()
@@ -376,6 +411,9 @@ class AES67Config:
             return False
         indent = line[:len(line) - len(line.lstrip())]
         self._raw_lines[line_idx] = f'{indent}# {stripped}'
+        # keep _data/_line_map in sync – a later set() would otherwise
+        # treat the key as missing and insert a duplicate line
+        self._parse()
         self._modified = True
         return True
 
@@ -388,6 +426,9 @@ class AES67Config:
             return False
         line_idx = self._find_line_idx(keys)
         if line_idx is None:
+            # commented keys are not in _line_map
+            line_idx = self._find_line_idx_raw(keys)
+        if line_idx is None:
             return False
         line = self._raw_lines[line_idx]
         stripped = line.strip()
@@ -396,6 +437,9 @@ class AES67Config:
         uncommented = stripped.lstrip('#').strip()
         indent = line[:len(line) - len(line.lstrip())]
         self._raw_lines[line_idx] = f'{indent}{uncommented}'
+        # re-register in _line_map so the following set() rewrites this
+        # line in place instead of appending a duplicate
+        self._parse()
         self._modified = True
         return True
 
@@ -407,18 +451,167 @@ class AES67Config:
             return None
         return cfg.get(*keys)
 
-    def reset_to_default(self):
+    def reset_to_default(self, iface=None):
         if not os.path.exists(self.default_path):
             return False
         if not self._loaded_path or self._loaded_path == self.default_path:
             return False
         try:
+            # backup the user config we are about to replace
+            if os.path.exists(self._loaded_path):
+                shutil.copy(self._loaded_path, self._loaded_path + '.bak')
             shutil.copy(self.default_path, self._loaded_path)
         except (OSError, PermissionError) as e:
             raise ConfigWriteError(f"Konnte Default nicht kopieren: {e}") from e
         self._modified = True
         self.load(self._loaded_path)
+        self.apply_sync67_defaults(iface)
+        # write the defaults to disk (backup already taken above)
+        self.save(backup=False)
         return True
+
+    # ─── sync67 documentation defaults ──────────────────────────
+
+    # (id_field, object name, {key: value template})
+    # '{iface}' templates are skipped when no interface is given.
+    _SYNC67_DEFAULT_RULES = (
+        ('factory', 'spa-node-factory', {
+            'resync.ms': '48',
+            'max_resync': '4',
+            'clock.interface': '"{iface}"',
+        }),
+        ('name', 'libpipewire-module-rt', {
+            'rt.prio': '83',
+            'rlimits.enabled': 'true',
+        }),
+        ('name', 'libpipewire-module-rtp-sink', {
+            'sess.max-ptime': '4',
+            'sess.latency.msec': '12',
+            'local.ifname': '{iface}',
+        }),
+        ('name', 'libpipewire-module-rtp-sap', {
+            'sess.latency.msec': '12',
+            'local.ifname': '{iface}',
+        }),
+    )
+
+    def apply_sync67_defaults(self, iface=None):
+        """Set the sync67 documentation defaults in _raw_lines.
+
+        Only for freshly copied stock configs (reset / first copy) –
+        existing user configs are never touched.
+        Returns True if something changed.
+        """
+        changed = False
+        for id_field, obj_name, values in self._SYNC67_DEFAULT_RULES:
+            for key, tpl in values.items():
+                if '{iface}' in tpl:
+                    if not iface:
+                        continue
+                    value = tpl.format(iface=iface)
+                else:
+                    value = tpl
+                changed |= self._apply_default_value(id_field, obj_name,
+                                                     key, value)
+        if changed:
+            self._parse()
+            self._modified = True
+        return changed
+
+    def _apply_default_value(self, id_field, obj_name, key, value):
+        """Set one key inside every object/module matching obj_name.
+
+        Rewrites the raw line (uncommenting it if needed) or inserts the
+        key into the args block when it does not exist yet.
+        """
+        changed = False
+        for start, end in self._find_object_ranges(id_field, obj_name):
+            line_idx = self._find_key_line(start, end, key)
+            if line_idx is not None:
+                line = self._raw_lines[line_idx]
+                indent = line[:len(line) - len(line.lstrip())]
+                was_commented = line.strip().startswith('#')
+                content = line.strip().lstrip('#').strip()
+                m = re.match(r'^(?P<head>\s*[\w.\-*]+\s*=\s*)'
+                             r'(?P<val>.*?)(?P<comma>,?)\s*$', content)
+                if not m:
+                    continue
+                new_content = m.group('head') + value + m.group('comma')
+                if content == new_content and not was_commented:
+                    continue
+                # always write an active line (stock ships rt.prio commented)
+                self._raw_lines[line_idx] = indent + new_content
+                changed = True
+            else:
+                insert_at = self._find_args_close(start, end)
+                if insert_at is None:
+                    continue
+                indent = self._detect_indent(start, end)
+                self._raw_lines.insert(insert_at, f'{indent}{key} = {value}')
+                changed = True
+        return changed
+
+    def _find_object_ranges(self, id_field, obj_name):
+        """Yield (start, end) line ranges of all matching objects/modules."""
+        ranges = []
+        # word-boundary match: 'libpipewire-module-rt' must not match
+        # 'libpipewire-module-rtp-sink'
+        needle = re.compile(
+            rf'{id_field}\s*=\s*{re.escape(obj_name)}(?![\w.-])')
+        depth = 0
+        start = None
+        for i, line in enumerate(self._raw_lines):
+            stripped = line.strip()
+            if start is None:
+                if '{' in stripped and needle.search(stripped):
+                    depth = stripped.count('{') - stripped.count('}')
+                    if depth <= 0:
+                        ranges.append((i, i))  # single-line object
+                    else:
+                        start = i
+                continue
+            depth += stripped.count('{') - stripped.count('}')
+            if depth <= 0:
+                ranges.append((start, i))
+                start = None
+        return ranges
+
+    def _find_key_line(self, start, end, key):
+        """First raw line with 'key =' inside [start, end] (comments allowed)."""
+        for i in range(start, end + 1):
+            content = self._raw_lines[i].strip()
+            if not content:
+                continue
+            content = content.lstrip('#').strip()
+            m = _KV_RE.match(content)
+            if m and m.group('key') == key:
+                return i
+        return None
+
+    def _find_args_close(self, start, end):
+        """Line index of the '}' closing the args block, or None."""
+        in_args = False
+        depth = 0
+        for i in range(start, end + 1):
+            stripped = self._raw_lines[i].strip()
+            if not in_args:
+                m = _BLOCK_START_RE.match(stripped)
+                if m and m.group('key') == 'args' and m.group('brace') == '{':
+                    in_args = True
+                    depth = 1
+                continue
+            depth += stripped.count('{') - stripped.count('}')
+            if depth <= 0:
+                return i
+        return None
+
+    def _detect_indent(self, start, end):
+        """Indent used by existing key lines inside the object (fallback 12)."""
+        for i in range(start, end + 1):
+            m = _KV_RE.match(self._raw_lines[i])
+            if m:
+                return m.group('indent')
+        return '            '
 
     def get_module_index(self, name):
         modules = self._data.get('context.modules', [])
@@ -731,7 +924,7 @@ class AES67Config:
 
         # ── _line_map lookup ─────────────────────────────────
         if section in ('context.properties', 'context.spa-libs'):
-            target_path = '.'.join(keys)
+            target_path = _join_path('', keys)
             for path, idx in self._line_map:
                 if path == target_path:
                     return idx
@@ -748,8 +941,7 @@ class AES67Config:
                         break
             if obj_idx is None:
                 return None
-            target_path = f'context.objects[{obj_idx}].' + '.'.join(
-                str(k) for k in keys[2:])
+            target_path = _join_path(f'context.objects[{obj_idx}]', keys[2:])
             for path, idx in self._line_map:
                 if path == target_path:
                     return idx
@@ -762,8 +954,7 @@ class AES67Config:
                 mod_idx = self.get_module_index(module_id)
             if mod_idx < 0:
                 return None
-            target_path = f'context.modules[{mod_idx}].' + '.'.join(
-                str(k) for k in keys[2:])
+            target_path = _join_path(f'context.modules[{mod_idx}]', keys[2:])
             for path, idx in self._line_map:
                 if path == target_path:
                     return idx
@@ -828,49 +1019,6 @@ class AES67Config:
             if depth == 0 and in_target:
                 in_target = False
                 in_args = False
-
-        return None
-        section = keys[0]
-
-        if section in ('context.properties', 'context.spa-libs'):
-            target_path = '.'.join(keys)
-            for path, idx in self._line_map:
-                if path == target_path:
-                    return idx
-            return None
-
-        if section == 'context.objects':
-            obj_id = keys[1]
-            obj_idx = obj_id if isinstance(obj_id, int) else None
-            if obj_idx is None:
-                # Find by factory name
-                objs = self._data.get('context.objects', [])
-                for i, o in enumerate(objs):
-                    if isinstance(o, dict) and o.get('factory') == obj_id:
-                        obj_idx = i
-                        break
-            if obj_idx is None:
-                return None
-            target_path = f'context.objects[{obj_idx}].' + '.'.join(
-                str(k) for k in keys[2:])
-            for path, idx in self._line_map:
-                if path == target_path:
-                    return idx
-            return None
-
-        if section == 'context.modules':
-            module_id = keys[1]
-            mod_idx = module_id if isinstance(module_id, int) else None
-            if mod_idx is None:
-                mod_idx = self.get_module_index(module_id)
-            if mod_idx < 0:
-                return None
-            target_path = f'context.modules[{mod_idx}].' + '.'.join(
-                str(k) for k in keys[2:])
-            for path, idx in self._line_map:
-                if path == target_path:
-                    return idx
-            return None
 
         return None
 

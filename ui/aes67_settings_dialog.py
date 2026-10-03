@@ -61,6 +61,42 @@ def _load_phc_devices():
     return _PHC_CACHE
 
 
+def ptp_interface():
+    """Interface configured in the PTP tab (empty when never set)."""
+    qs = QSettings("sync67", "ptp_settings")
+    return qs.value("selected_interface", "", type=str)
+
+
+def _value_equal(current, default):
+    """Deviation comparison: ignore quoting, int/float and unset differences.
+
+    Stock configs write 48, QDoubleSpinBox reads 48.0 – that must not
+    count as a deviation. Same for "eth0" vs eth0 and '' vs None.
+    """
+    if current in (None, '') and default in (None, ''):
+        return True
+    if current is None or default is None:
+        return str(current) == str(default)
+    a = str(current).strip().strip('"')
+    b = str(default).strip().strip('"')
+    if a == b:
+        return True
+    try:
+        return float(a) == float(b)
+    except (ValueError, TypeError):
+        return False
+
+
+def _list_items(value):
+    """Normalize a list-ish value to ['CH1', 'CH2'] for comparison."""
+    if isinstance(value, (list, tuple)):
+        parts = list(value)
+    else:
+        text = str(value).strip().strip('[').strip(']')
+        parts = text.split(',')
+    return [str(p).strip().strip('"').strip("'") for p in parts if str(p).strip()]
+
+
 def _strip_quotes(s):
     if isinstance(s, str) and s.startswith('"') and s.endswith('"'):
         return s[1:-1]
@@ -101,7 +137,11 @@ class ParamWidget:
 
 class StringWidget(ParamWidget):
     def get_value(self):
-        return f'"{self.widget.text()}"'
+        text = self.widget.text()
+        if not text.strip():
+            # empty = parameter not set (gets commented out on save)
+            return ''
+        return f'"{text}"'
 
     def set_value(self, value):
         if isinstance(value, str) and value.startswith('"'):
@@ -219,6 +259,12 @@ class InterfaceWidget(ParamWidget):
             if self.widget.itemText(i) == val_str:
                 self.widget.setCurrentIndex(i)
                 return
+        if val_str:
+            # Configured interface is not present right now (e.g. USB NIC
+            # unplugged) – keep it instead of commenting the key out on Apply
+            self.widget.addItem(val_str)
+            self.widget.setCurrentIndex(self.widget.count() - 1)
+            return
         # Value not in list (e.g. saved empty) → select (empty) option
         self.widget.setCurrentIndex(0)
 
@@ -238,6 +284,10 @@ class PhcDeviceWidget(ParamWidget):
             if self.widget.itemText(i) == val_str:
                 self.widget.setCurrentIndex(i)
                 return
+        if val_str:
+            self.widget.addItem(val_str)
+            self.widget.setCurrentIndex(self.widget.count() - 1)
+            return
         self.widget.setCurrentIndex(0)
 
 
@@ -389,17 +439,20 @@ def create_widget(param_def, current_value):
 
     # Deviation tracking
     def check_deviation():
+        # Machine-specific values (network interface, PHC device) have no
+        # meaningful "default" – a gold border would only be noise.
+        if param_def.type in ('interface', 'phc_device'):
+            pw.mark_deviation(False)
+            return
         try:
             current = pw.get_value()
         except Exception:
             return
         default = param_def.default
         if param_def.type == 'multiline' and isinstance(current, list):
-            current_str = ', '.join(v.strip('"') for v in current)
-            default_str = default.strip('"').strip('[').strip(']') if isinstance(default, str) else str(default)
-            is_dev = current_str != default_str
+            is_dev = _list_items(current) != _list_items(default or '')
         else:
-            is_dev = str(current) != str(default)
+            is_dev = not _value_equal(current, default)
         pw.mark_deviation(is_dev)
 
     # Connect change signal
@@ -486,6 +539,22 @@ class AES67SettingsDialog(QDialog):
         self._fix_config_format()
         self.config._parse()
         self._init_ui()
+        # snapshot the values as loaded – Apply must not materialize keys
+        # the user left commented/untouched
+        self._initial_values = {}
+        self._sink_initial = {}
+        for _k, _pw in self.widgets.items():
+            try:
+                self._initial_values[_k] = _pw.get_value()
+            except Exception:
+                pass
+        for _tab in self.rtp_sink_tabs:
+            for _k, _v in _tab.collect_values().items():
+                self._sink_initial.setdefault((_tab.sink_index, _k), _v)
+        # _init_ui() fires textChanged (rules editor) – no real changes yet
+        self._has_changes = False
+        self._rules_initial_text = getattr(
+            self, '_rules_initial_text', '') or ''
 
     def _apply_dark_theme(self):
         app = QApplication.instance()
@@ -650,8 +719,9 @@ class AES67SettingsDialog(QDialog):
         is_iface_commented = self._is_key_commented('context.objects', 0, 'args', 'clock.interface')
         is_dev_commented = self._is_key_commented('context.objects', 0, 'args', 'clock.device')
         cid = self.config.get('context.objects', 0, 'args', 'clock.id')
-        is_realtime = cid and str(cid).strip('"') == 'realtime'
-        self.system_clock_cb.setChecked((is_iface_commented or is_dev_commented) and is_realtime)
+        is_realtime = bool(cid) and str(cid).strip('"') == 'realtime'
+        self.system_clock_cb.setChecked(
+            bool(is_iface_commented or is_dev_commented) and is_realtime)
         self.system_clock_cb.toggled.connect(self._on_system_clock_toggled)
         form.addRow(self.system_clock_cb)
         # Apply phc2sys mode to widgets if checkbox is checked
@@ -776,6 +846,7 @@ class AES67SettingsDialog(QDialog):
             self.rules_editor.setPlainText(rules_text)
         else:
             self.rules_editor.setPlainText('# No stream.rules found')
+        self._rules_initial_text = self.rules_editor.toPlainText().strip()
         self.rules_editor.textChanged.connect(self._mark_changes)
 
         layout.addWidget(rules_group)
@@ -788,6 +859,9 @@ class AES67SettingsDialog(QDialog):
         if not self.config._raw_lines:
             return False
         line_idx = self.config._find_line_idx(list(keys))
+        if line_idx is None:
+            # commented keys are not in _line_map – scan raw lines
+            line_idx = self.config._find_line_idx_raw(list(keys))
         if line_idx is None:
             return False
         return self.config._raw_lines[line_idx].strip().startswith('#')
@@ -815,7 +889,17 @@ class AES67SettingsDialog(QDialog):
                         self.config.uncomment_key(*keys)
                         if not self.config.set(value, *keys):
                             print(f"Warning: could not save {key}")
+                elif value == '':
+                    # empty string value = parameter not set
+                    self.config.comment_key(*keys)
+                elif (self._is_key_commented(*keys)
+                      and _value_equal(value, self._initial_values.get(key, value))):
+                    # user explicitly disabled this key and did not touch
+                    # the widget – keep it commented instead of writing
+                    # a duplicate line for a value he never chose
+                    continue
                 else:
+                    self.config.uncomment_key(*keys)
                     if not self.config.set(value, *keys):
                         print(f"Warning: could not save {key}")
 
@@ -838,13 +922,25 @@ class AES67SettingsDialog(QDialog):
                         keys = ('context.modules', tab.sink_index) + pdef.path
                         if key == 'sink.local.ifname' and val == '':
                             self.config.comment_key(*keys)
-                        elif not self.config.set(val, *keys):
-                            print(f"Warning: could not save {key} for sink {tab.sink_index}")
+                        elif (self._is_key_commented(*keys)
+                              and _value_equal(
+                                  val,
+                                  self._sink_initial.get(
+                                      (tab.sink_index, key), val))):
+                            continue
+                        else:
+                            self.config.uncomment_key(*keys)
+                            if not self.config.set(val, *keys):
+                                print(f"Warning: could not save {key} for sink {tab.sink_index}")
 
-            # Save stream.rules raw editor
+            # Save stream.rules raw editor – only when the user actually
+            # edited it, otherwise it would overwrite values that widgets
+            # (e.g. SAP latency) just wrote into the same block.
             if hasattr(self, 'rules_editor'):
                 rules_text = self.rules_editor.toPlainText().strip()
-                if rules_text and not rules_text.startswith('#'):
+                initial = getattr(self, '_rules_initial_text', rules_text)
+                if (rules_text and not rules_text.startswith('#')
+                        and rules_text != initial):
                     self.config.set_raw_block(
                         rules_text,
                         'context.modules', 'libpipewire-module-rtp-sap',
@@ -874,17 +970,23 @@ class AES67SettingsDialog(QDialog):
         reply = QMessageBox.warning(
             self, 'Reset Config',
             'Are you sure? Your config will be replaced by the\n'
-            'default config from /usr/share/pipewire/pipewire-aes67.conf.\n'
-            'A backup will be saved as .bak.',
+            'stock default (/usr/share/pipewire/pipewire-aes67.conf)\n'
+            'plus the sync67 documentation recommendations:\n'
+            '  resync.ms=48, max_resync=4, rt.prio=83,\n'
+            '  sess.max-ptime=4, sess.latency.msec=12,\n'
+            '  interface taken from the PTP tab.\n'
+            'A backup is saved as .bak.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
-            self.config.reset_to_default()
+            if not self.config.reset_to_default(ptp_interface()):
+                raise RuntimeError('Default config not available.')
             self.config.load(self.config.get_loaded_path())
             self._fix_config_format()
-            self.config.save()
+            # .bak was already written by reset_to_default()
+            self.config.save(backup=False)
             self.config.load(self.config.get_loaded_path())
             QMessageBox.information(self, 'Reset',
                                     'Config reset to Default.')
@@ -1004,8 +1106,7 @@ class AES67SettingsDialog(QDialog):
     @staticmethod
     def _ptp4l_interface():
         """Read the configured ptp4l interface from QSettings."""
-        qs = QSettings("sync67", "ptp_settings")
-        return qs.value("selected_interface", "", type=str)
+        return ptp_interface()
 
     def _apply_system_clock_mode(self, checked):
         """Apply or restore phc2sys mode to widgets without saving to QSettings."""
@@ -1033,6 +1134,9 @@ class AES67SettingsDialog(QDialog):
             phc_dev = self._phc_for_interface(ptp_iface) if ptp_iface else None
             if dev_w and phc_dev:
                 dev_w.set_value(phc_dev)
+            if id_w and str(id_w.get_value()).strip('"') == 'realtime':
+                # leave no stale realtime id behind in interface mode
+                id_w.widget.setText('')
             if sap_w and ptp_iface:
                 sap_w.set_value(ptp_iface)
             for tab in self.rtp_sink_tabs:
