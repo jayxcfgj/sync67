@@ -24,6 +24,8 @@ def _trim_terminal(edit, max_lines=_MAX_TERMINAL_LINES):
         cursor.deleteChar()
 from pathlib import Path
 
+from core.net_interface import choose_interface
+
 class PTPTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -278,17 +280,23 @@ class PTPTab(QWidget):
                 interfaces = re.findall(r'^\d+: (\w+):', result.stdout, re.MULTILINE)
                 interfaces = [iface for iface in interfaces if iface != 'lo']
                 self.interface_combo.addItems(interfaces)
+                available = interfaces
             else:
                 self.interface_combo.addItem("Error loading interfaces")
+                available = []
         except Exception as e:
             self.interface_combo.addItem(f"Error: {str(e)}")
-        # Gespeichertes Interface wiederherstellen
+            available = []
+        # Auswahl: Benutzerwahl, sonst PHC-NIC, sonst erstes Interface –
+        # danach gilt Combo == QSettings == ptp4l -i
         settings = QSettings("sync67", "ptp_settings")
         saved = settings.value("selected_interface", "", type=str)
-        if saved:
-            idx = self.interface_combo.findText(saved)
+        iface = choose_interface(saved, available)
+        if iface:
+            idx = self.interface_combo.findText(iface)
             if idx >= 0:
                 self.interface_combo.setCurrentIndex(idx)
+            settings.setValue("selected_interface", iface)
         # Änderungen speichern
         self.interface_combo.currentIndexChanged.connect(self._save_interface)
 
@@ -321,6 +329,10 @@ class PTPTab(QWidget):
             if not iface or iface.startswith("Error"):
                 self.terminal_output.append("Please select a valid network interface")
                 return
+
+            # Auswahl dauerhaft sichern: Combo == QSettings == ptp4l -i
+            QSettings("sync67", "ptp_settings").setValue(
+                "selected_interface", iface)
 
             self.terminal_output.clear()
             self.terminal_output.append(f"Starting PTP on interface {iface}...")
