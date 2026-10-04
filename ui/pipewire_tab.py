@@ -50,6 +50,9 @@ class PipeWireTab(QWidget):
         self._current_quantum = 0
         self._last_nodes = []
         self._aes67_node_names = set()
+        # Nutzer-Auswahl gesperrt bis Apply/Reset/Refresh?
+        self._rate_dirty = False
+        self._q_dirty = False
         self.init_ui()
         self._timer.start(2000)
         QTimer.singleShot(300, self._update_all)
@@ -69,12 +72,13 @@ class PipeWireTab(QWidget):
         self.rate_combo = QComboBox()
         for v in (48000, 96000, 192000):
             self.rate_combo.addItem(str(v), v)
+        self.rate_combo.activated.connect(self._mark_rate_dirty)
         self.rate_apply = QPushButton('Apply')
         self.rate_apply.clicked.connect(lambda: self._set_metadata('clock.force-rate', self.rate_combo.currentText()))
         self.rate_reset = QPushButton('Reset')
         self.rate_reset.clicked.connect(lambda: self._set_metadata('clock.force-rate', '0'))
-        self.rate_refresh = QPushButton('\u21bb')
-        self.rate_refresh.clicked.connect(self._refresh_rate)
+        self.rate_refresh = QPushButton('↻')
+        self.rate_refresh.clicked.connect(self._on_rate_refresh)
         self.rate_status = QLabel('Current: \u2014')
         self.rate_status.setStyleSheet('color: #aaa;')
         g.addWidget(QLabel('Sample Rate:'), 0, 0)
@@ -92,12 +96,14 @@ class PipeWireTab(QWidget):
         for v in (16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192):
             self.q_combo.addItem(str(v), v)
         self.q_combo.setEditable(True)
+        self.q_combo.activated.connect(self._mark_q_dirty)
+        self.q_combo.lineEdit().textEdited.connect(self._mark_q_dirty)
         self.q_apply = QPushButton('Apply')
         self.q_apply.clicked.connect(lambda: self._set_metadata('clock.force-quantum', self.q_combo.currentText()))
         self.q_reset = QPushButton('Reset')
         self.q_reset.clicked.connect(lambda: self._set_metadata('clock.force-quantum', '0'))
-        self.q_refresh = QPushButton('\u21bb')
-        self.q_refresh.clicked.connect(self._refresh_quantum)
+        self.q_refresh = QPushButton('↻')
+        self.q_refresh.clicked.connect(self._on_q_refresh)
         self.q_status = QLabel('Current: \u2014')
         self.q_status.setStyleSheet('color: #aaa;')
         g.addWidget(QLabel('Quantum:'), 0, 0)
@@ -208,11 +214,48 @@ class PipeWireTab(QWidget):
 
     # ─── pw-metadata: Rate ───────────────────────────────────
 
+    # ─── Nutzer-Auswahl vs. Timer-Refresh ─────────────────────
+
+    def _mark_rate_dirty(self, *args):
+        self._rate_dirty = True
+
+    def _mark_q_dirty(self, *args):
+        self._q_dirty = True
+
+    def _set_rate_combo(self, index=None, text=None):
+        """Rate-Combo schreiben – nur solange der Nutzer nichts gewaehlt hat."""
+        if self._rate_dirty:
+            return
+        if index is not None:
+            self.rate_combo.setCurrentIndex(index)
+        else:
+            self.rate_combo.setCurrentText(text)
+
+    def _set_q_combo(self, index=None, text=None):
+        """Quantum-Combo schreiben – nur solange der Nutzer nichts gewaehlt hat."""
+        if self._q_dirty:
+            return
+        if index is not None:
+            self.q_combo.setCurrentIndex(index)
+        else:
+            self.q_combo.setCurrentText(text)
+
+    def _on_rate_refresh(self):
+        self._rate_dirty = False
+        self._refresh_rate()
+
+    def _on_q_refresh(self):
+        self._q_dirty = False
+        self._refresh_quantum()
+
     def _set_metadata(self, key, value):
         self._run([_PW_META, '-n', 'settings', '0', key, str(value)])
         if 'rate' in key:
+            # Auswahl wurde angewandt -> wieder Systemwert anzeigen
+            self._rate_dirty = False
             self._refresh_rate()
         else:
+            self._q_dirty = False
             self._refresh_quantum()
 
     def _refresh_rate(self):
@@ -256,18 +299,18 @@ class PipeWireTab(QWidget):
             if val == 0:
                 effective = self._get_effective_rate()
                 if effective and effective > 0:
-                    self.rate_combo.setCurrentText(str(effective))
+                    self._set_rate_combo(text=str(effective))
                     self.rate_status.setText(f'Effective: {effective} Hz (Metadata: Default)')
                     self._current_rate = effective
                 else:
-                    self.rate_combo.setCurrentText('')
+                    self._set_rate_combo(text='')
                     self.rate_status.setText('Current: Default (not set)')
             else:
                 idx = self.rate_combo.findData(val)
                 if idx >= 0:
-                    self.rate_combo.setCurrentIndex(idx)
+                    self._set_rate_combo(index=idx)
                 else:
-                    self.rate_combo.setCurrentText(str(val))
+                    self._set_rate_combo(text=str(val))
                 self.rate_status.setText(f'Current: {val} Hz')
         else:
             preview = (out or '')[:100].strip().replace('\n', ' ')
@@ -309,18 +352,18 @@ class PipeWireTab(QWidget):
                 # Metadata = 0 (Default) → effektiven Wert aus pw-top holen
                 effective = self._get_effective_quantum()
                 if effective and effective > 0:
-                    self.q_combo.setCurrentText(str(effective))
+                    self._set_q_combo(text=str(effective))
                     self.q_status.setText(f'Effective: {effective} Samples (Metadata: Default)')
                     self._current_quantum = effective
                 else:
-                    self.q_combo.setCurrentText('')
+                    self._set_q_combo(text='')
                     self.q_status.setText('Current: Default (not set)')
             else:
                 idx = self.q_combo.findData(val)
                 if idx >= 0:
-                    self.q_combo.setCurrentIndex(idx)
+                    self._set_q_combo(index=idx)
                 else:
-                    self.q_combo.setCurrentText(str(val))
+                    self._set_q_combo(text=str(val))
                 self.q_status.setText(f'Current: {val} Samples')
         else:
             preview = (out or '')[:100].strip().replace('\n', ' ')
@@ -708,7 +751,7 @@ class PipeWireTab(QWidget):
             # Metadata ist gesetzt → Metadata-Wert anzeigen
             self._current_rate = meta_val
             idx = self.rate_combo.findData(meta_val)
-            self.rate_combo.setCurrentIndex(idx) if idx >= 0 else self.rate_combo.setCurrentText(str(meta_val))
+            self._set_rate_combo(index=idx) if idx >= 0 else self._set_rate_combo(text=str(meta_val))
             self.rate_status.setText(f'Current: {meta_val} Hz')
             self._update_latency()
             return
@@ -716,7 +759,7 @@ class PipeWireTab(QWidget):
         if effective > 0:
             self._current_rate = effective
             idx = self.rate_combo.findData(effective)
-            self.rate_combo.setCurrentIndex(idx) if idx >= 0 else self.rate_combo.setCurrentText(str(effective))
+            self._set_rate_combo(index=idx) if idx >= 0 else self._set_rate_combo(text=str(effective))
             self.rate_status.setText(f'Effective: {effective} Hz')
             self._update_latency()
 
@@ -725,14 +768,14 @@ class PipeWireTab(QWidget):
         if meta_val is not None and meta_val > 0:
             self._current_quantum = meta_val
             idx = self.q_combo.findData(meta_val)
-            self.q_combo.setCurrentIndex(idx) if idx >= 0 else self.q_combo.setCurrentText(str(meta_val))
+            self._set_q_combo(index=idx) if idx >= 0 else self._set_q_combo(text=str(meta_val))
             self.q_status.setText(f'Current: {meta_val} Samples')
             self._update_latency()
             return
         effective = self._get_effective_quantum()
         if effective > 0:
             self._current_quantum = effective
-            self.q_combo.setCurrentText(str(effective))
+            self._set_q_combo(text=str(effective))
             self.q_status.setText(f'Effective: {effective} Samples')
             self._update_latency()
 
