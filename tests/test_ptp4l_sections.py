@@ -31,7 +31,8 @@ sys.path.insert(0, REPO)
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from core.ptp4l_config import PTP4LConfig
-from core.ptp4l_config_meta import CONFIG_PARAMS, PARAM_MAP
+from core.ptp4l_config_meta import (CONFIG_PARAMS, PARAM_MAP,
+                                    INTERFACE_META_KEYS)
 
 FAILS = []
 
@@ -282,15 +283,6 @@ def check_reset_creates_interface_section():
 
 # ── 7) Meta-Scope ─────────────────────────────────────────────
 
-# Zeitstempel-Berechtigung: time_stamping fehlt hier bewusst – ptp4l
-# akzeptiert den Key nicht in der Interface-Section, er gehoert nach global.
-INTERFACE_META_KEYS = (
-    "delay_mechanism", "network_transport",
-    "delayAsymmetry", "logMinPdelayReqInterval", "logMinDelayReqInterval",
-    "logSyncInterval", "logAnnounceInterval", "announceReceiptTimeout",
-    "fault_reset_interval",
-)
-
 
 def check_meta_scope():
     print("7) Meta-Scope: nur conf-belegte Keys sind 'interface'")
@@ -305,8 +297,11 @@ def check_meta_scope():
             continue
         check(f"{pdef.key} scope=global", pdef.scope == "global",
               repr(pdef.scope))
-    check("fault_badpeernet_interval hat keinen ParamDef (raw)",
-          "fault_badpeernet_interval" not in PARAM_MAP)
+    check("fault_badpeernet_interval scope=interface",
+          "fault_badpeernet_interval" in PARAM_MAP
+          and PARAM_MAP["fault_badpeernet_interval"].scope == "interface",
+          repr(PARAM_MAP.get("fault_badpeernet_interval")
+               and PARAM_MAP["fault_badpeernet_interval"].scope))
 
 
 # ── 8) Dialog ─────────────────────────────────────────────────

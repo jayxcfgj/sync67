@@ -27,12 +27,11 @@ class ParamDef:
 # Interface-Section AKTIV stehen (Referenz: dort "funktionieren" die Werte).
 # time_stamping fehlt mit Absicht: dort nur kommentiert – ptp4l akzeptiert
 # den Key nicht aktiv in der Interface-Section, er gehoert nach [global].
-# fault_badpeernet_interval fehlt hier ebenfalls: kein ParamDef (raw-Line).
 INTERFACE_META_KEYS = frozenset({
     'delay_mechanism', 'network_transport',
     'delayAsymmetry', 'logMinPdelayReqInterval', 'logMinDelayReqInterval',
     'logSyncInterval', 'logAnnounceInterval', 'announceReceiptTimeout',
-    'fault_reset_interval',
+    'fault_reset_interval', 'fault_badpeernet_interval',
 })
 
 
@@ -201,6 +200,12 @@ CONFIG_PARAMS = [
              label='Fault Reset Interval',
              tooltip='Interval for fault reset (log2 seconds).\n4 = 16 s.',
              section='Port', min_val=0, max_val=7),
+    ParamDef('fault_badpeernet_interval', 'int', 16,
+             label='Fault Reset Interval (Pdelay)',
+             tooltip='Seconds between peer-network misconfiguration\n'
+                     'detection and fault reset (port disabled meanwhile).\n'
+                     'Plain seconds, not log2.',
+             section='Port', min_val=0, max_val=3600),
     ParamDef('neighborPropDelayThresh', 'int', 20000000,
              label='Neighbor Prop Delay Threshold',
              tooltip='Maximum neighbor propagation delay in ns.\n20 ms = typical threshold.',
