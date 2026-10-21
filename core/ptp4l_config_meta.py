@@ -24,10 +24,12 @@ class ParamDef:
 
 
 # Genau die Keys, die in der aktuellen /etc/linuxptp/ptp4l.conf unter der
-# Interface-Section stehen (Referenz: dort "funktionieren" die Werte).
-# fault_badpeernet_interval fehlt hier mit Absicht: kein ParamDef (raw-Line).
+# Interface-Section AKTIV stehen (Referenz: dort "funktionieren" die Werte).
+# time_stamping fehlt mit Absicht: dort nur kommentiert – ptp4l akzeptiert
+# den Key nicht aktiv in der Interface-Section, er gehoert nach [global].
+# fault_badpeernet_interval fehlt hier ebenfalls: kein ParamDef (raw-Line).
 INTERFACE_META_KEYS = frozenset({
-    'delay_mechanism', 'network_transport', 'time_stamping',
+    'delay_mechanism', 'network_transport',
     'delayAsymmetry', 'logMinPdelayReqInterval', 'logMinDelayReqInterval',
     'logSyncInterval', 'logAnnounceInterval', 'announceReceiptTimeout',
     'fault_reset_interval',

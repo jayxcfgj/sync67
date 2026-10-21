@@ -282,8 +282,10 @@ def check_reset_creates_interface_section():
 
 # ── 7) Meta-Scope ─────────────────────────────────────────────
 
+# Zeitstempel-Berechtigung: time_stamping fehlt hier bewusst – ptp4l
+# akzeptiert den Key nicht in der Interface-Section, er gehoert nach global.
 INTERFACE_META_KEYS = (
-    "delay_mechanism", "network_transport", "time_stamping",
+    "delay_mechanism", "network_transport",
     "delayAsymmetry", "logMinPdelayReqInterval", "logMinDelayReqInterval",
     "logSyncInterval", "logAnnounceInterval", "announceReceiptTimeout",
     "fault_reset_interval",
@@ -378,6 +380,76 @@ def check_dialog_missing_section_created():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def check_time_stamping_global_only():
+    print("8d) time_stamping: nur global, nie in der Interface-Section")
+    d = tmpdir()
+    try:
+        path = write_cfg(d)
+        cfg = load_cfg(path)
+        from ui.ptp4l_config_dialog import PTP4LConfigDialog
+
+        # Neues Interface ohne Section: Apply legt Section an – aber ohne
+        # time_stamping (ptp4l wuerden den aktiven Key dort ablehnen)
+        dlg = PTP4LConfigDialog(cfg, "enp55s0", None)
+        check("time_stamping im Global-Pane",
+              dlg._key_section.get("time_stamping") == "global",
+              repr(dlg._key_section.get("time_stamping")))
+        dlg._on_apply()
+        check("kein time_stamping in neuer Interface-Section",
+              "time_stamping" not in section_text(path, "enp55s0"),
+              section_text(path, "enp55s0"))
+        c_new = load_cfg(path)
+        check("logAnnounceInterval = Meta-Default, nicht erste Choice (-3)",
+              c_new.get("logAnnounceInterval", "enp55s0") == 1,
+              repr(c_new.get("logAnnounceInterval", "enp55s0")))
+
+        # Bestehende kommentierte Zeile (Referenz-Conf) bleibt kommentiert
+        cfg2 = load_cfg(path)
+        dlg2 = PTP4LConfigDialog(cfg2, "enp37s0", None)
+        dlg2._on_apply()
+        c3 = load_cfg(path)
+        check("kommentierte time_stamping-Zeile bleibt kommentiert",
+              c3.get_comment_state("time_stamping", "enp37s0") is True)
+        check("time_stamping-Global-Zeile aktiv",
+              c3.get_comment_state("time_stamping", "global") is False
+              and c3.get("time_stamping", "global") is not None,
+              repr((c3.get("time_stamping", "global"),
+                    c3.get_comment_state("time_stamping", "global"))))
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def check_splitter_centered():
+    """Beim Oeffnen soll der Spalten-Split mittig liegen (Default)."""
+    print("8e) Splitter zentriert beim Oeffnen")
+    d = tmpdir()
+    try:
+        path = write_cfg(d)
+        cfg = load_cfg(path)
+        from ui.ptp4l_config_dialog import PTP4LConfigDialog
+        dlg = PTP4LConfigDialog(cfg, "enp37s0", None)
+        dlg.resize(1200, 800)
+        dlg.show()
+        app = QApplication.instance()
+        for _ in range(5):
+            app.processEvents()  # showEvent + singleShot(0) abarbeiten
+        splitters = getattr(dlg, "_splitters", [])
+        # 7 Section-Tabs haben einen Splitter, der Other-Tab nicht
+        check("7 Splitter (alle ausser Other)", len(splitters) == 7,
+              len(splitters))
+        for i, sp in enumerate(splitters):
+            sizes = sp.sizes()
+            if not sizes or len(sizes) < 2 or 0 in sizes:
+                check(f"Splitter {i} hat zwei sichtbare Spalten", False,
+                      repr(sizes))
+                continue
+            check(f"Splitter {i} mittig ({sizes[0]} vs {sizes[1]})",
+                  abs(sizes[0] - sizes[1]) <= 4, repr(sizes))
+        dlg.close()
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def check_real_conf_apply_unchanged():
     """Kopie der echten /etc/linuxptp/ptp4l.conf: Apply ohne Aenderungen
     darf nichts umschreiben (kein Wert, keine Kommentarzeile verloren)."""
@@ -423,6 +495,8 @@ def main():
     check_meta_scope()
     check_dialog_two_columns()
     check_dialog_missing_section_created()
+    check_time_stamping_global_only()
+    check_splitter_centered()
     check_real_conf_apply_unchanged()
 
     print("FAILS: NONE" if not FAILS else f"FAILS: {FAILS}")

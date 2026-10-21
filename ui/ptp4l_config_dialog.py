@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QPushButton,
     QFormLayout, QWidget, QScrollArea, QMessageBox, QTextEdit
 )
-from PyQt6.QtCore import Qt, QRegularExpression
+from PyQt6.QtCore import Qt, QRegularExpression, QTimer
 from PyQt6.QtGui import QPalette, QColor, QRegularExpressionValidator, QFont
 
 from core.ptp4l_config import PTP4LConfig, format_value, _KV_RE
@@ -168,6 +168,11 @@ def create_widget(param_def, current_value, on_change=None):
 
     if current_value is not None:
         pw.set_value(current_value)
+    else:
+        # Kein Wert in der Config: Meta-Default zeigen (nicht das SpinBox-
+        # Minimum oder die erste Choice – sonst schreibt Apply bei neu
+        # angelegter Interface-Section Murks wie logAnnounceInterval=-3)
+        pw.set_value(param_def.default)
 
     layout.addWidget(w)
     layout.addWidget(default_label)
@@ -209,6 +214,7 @@ class PTP4LConfigDialog(QDialog):
         self._key_section = {}      # key -> 'global' oder Interface-Name
         self._iface_pane_labels = []  # Header-Labels (bei Reset umbenennen)
         self._other_key_section = {}  # Other-Tab: key -> Section
+        self._splitters = []          # Pro-Tab-Splitter (beim Oeffnen mittig)
         self._has_changes = False
         self.setWindowTitle('PTP4L Config Editor')
         self.setMinimumSize(480, 300)
@@ -330,6 +336,10 @@ class PTP4LConfigDialog(QDialog):
             else:
                 key_section = 'global'
             val = self.config.get(pdef.key, key_section)
+            if val is None and key_section != 'global':
+                # Interface-Section (noch) ohne den Key: den aktuellen
+                # Global-Wert zeigen – das ist, was ptp4l bisher wirkt
+                val = self.config.get(pdef.key, 'global')
             container, pw = create_widget(pdef, val, on_change=self._mark_changes)
             self.widgets[pdef.key] = pw
             self.containers[pdef.key] = container
@@ -356,8 +366,21 @@ class PTP4LConfigDialog(QDialog):
 
         splitter.addWidget(glob_box)
         splitter.addWidget(iface_box)
-        splitter.setSizes([1, 1])
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+        self._splitters.append(splitter)
         self.tabs.addTab(splitter, tab_label)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Nach dem Layout: Spalten-Split default-mittig positionieren
+        QTimer.singleShot(0, self._center_splitters)
+
+    def _center_splitters(self):
+        for sp in self._splitters:
+            w = sp.width()
+            if w > 0:
+                sp.setSizes([w // 2, w // 2])
 
     def _set_interface_name(self, name):
         """Interface-Section umbenennen (naechster Reset mit anderem NIC)."""
@@ -569,7 +592,10 @@ class PTP4LConfigDialog(QDialog):
 
     def _reload_widgets(self):
         for key, pw in self.widgets.items():
-            val = self.config.get(key, self._key_section.get(key, 'global'))
+            section = self._key_section.get(key, 'global')
+            val = self.config.get(key, section)
+            if val is None and section != 'global':
+                val = self.config.get(key, 'global')
             if val is not None:
                 pw.set_value(val)
         self._update_pi_param_states()
