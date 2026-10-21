@@ -3,11 +3,11 @@
 
 class ParamDef:
     __slots__ = ('key', 'type', 'default', 'label', 'tooltip',
-                 'section', 'choices', 'min_val', 'max_val', 'step')
+                 'section', 'choices', 'min_val', 'max_val', 'step', 'scope')
 
     def __init__(self, key, ptype, default, label='', tooltip='',
                  section='Quick', choices=None,
-                 min_val=None, max_val=None, step=None):
+                 min_val=None, max_val=None, step=None, scope='global'):
         self.key = key
         self.type = ptype
         self.default = default
@@ -18,6 +18,20 @@ class ParamDef:
         self.min_val = min_val
         self.max_val = max_val
         self.step = step
+        # scope: 'global'  -> [global]-Section der ptp4l.conf
+        #        'interface' -> [iface]-Section (wird von ptp4l pro Port gelesen)
+        self.scope = scope
+
+
+# Genau die Keys, die in der aktuellen /etc/linuxptp/ptp4l.conf unter der
+# Interface-Section stehen (Referenz: dort "funktionieren" die Werte).
+# fault_badpeernet_interval fehlt hier mit Absicht: kein ParamDef (raw-Line).
+INTERFACE_META_KEYS = frozenset({
+    'delay_mechanism', 'network_transport', 'time_stamping',
+    'delayAsymmetry', 'logMinPdelayReqInterval', 'logMinDelayReqInterval',
+    'logSyncInterval', 'logAnnounceInterval', 'announceReceiptTimeout',
+    'fault_reset_interval',
+})
 
 
 def _int_choices(*vals):
@@ -559,6 +573,13 @@ CONFIG_PARAMS = [
 ]
 
 PARAM_MAP = {p.key: p for p in CONFIG_PARAMS}
+
+# Interface-Keys aus der Referenz-Conf aktiv taggen (Single Source: die
+# INTERFACE_META_KEYS-Menge oben – eine Stelle zum Anpassen).
+for _key in INTERFACE_META_KEYS:
+    _p = PARAM_MAP.get(_key)
+    if _p is not None:
+        _p.scope = 'interface'
 
 SECTION_ORDER = ['Quick', 'Default', 'Port', 'Runtime', 'Servo', 'Transport', 'Interface']
 

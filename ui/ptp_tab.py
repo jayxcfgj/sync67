@@ -774,11 +774,21 @@ class PTPTab(QWidget):
 
         from core.ptp4l_config import PTP4LConfig
         from ui.ptp4l_config_dialog import PTP4LConfigDialog
+        from core.net_interface import phc_interfaces
+
+        iface = self.interface_combo.currentText()
+        if not iface:
+            avail = phc_interfaces()
+            iface = avail[0] if avail else ''
+        if not iface:
+            self.terminal_output.append(
+                "No network interface available for the config editor.")
+            return
 
         try:
             cfg = PTP4LConfig()
             cfg.load(ptp4l_path)
-            dialog = PTP4LConfigDialog(cfg, self)
+            dialog = PTP4LConfigDialog(cfg, iface, self)
             if dialog.exec() == PTP4LConfigDialog.DialogCode.Accepted:
                 self.terminal_output.append("PTP4L config saved.")
         except Exception as e:

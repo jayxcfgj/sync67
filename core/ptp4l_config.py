@@ -16,8 +16,28 @@ class PTP4LConfigError(Exception):
 
 
 _KV_RE = re.compile(r'^(\w[\w.]*)\s+(.+)$')
-_COMMENTED_KV_RE = re.compile(r'^#(\w[\w.]*)\s+(.+)$')
+# Auch "# key value" (Leerzeichen nach #) als kommentierter Key erkennen
+_COMMENTED_KV_RE = re.compile(r'^#\s*(\w[\w.]*)\s+(.+)$')
 _SECTION_RE = re.compile(r'^#\s+[A-Z]')
+_SECTION_HEADER_RE = re.compile(r'^\[([^\]]+)\]\s*$')
+
+# Interface-Section-Defaults: exakt wie in der aktuellen
+# /etc/linuxptp/ptp4l.conf unter [enp37s0] (Referenz: dort funktionieren
+# die Werte). time_stamping bleibt bewusst kommentiert, damit der
+# globale Wert weiter greift.
+INTERFACE_DEFAULT_LINES = [
+    'delay_mechanism\tE2E',
+    'network_transport\tUDPv4',
+    '# time_stamping\thardware',
+    'delayAsymmetry\t0',
+    'logMinPdelayReqInterval\t0',
+    'logSyncInterval\t0',
+    'logAnnounceInterval\t0',
+    'announceReceiptTimeout\t3',
+    'logMinDelayReqInterval\t0',
+    'fault_reset_interval\t4',
+    'fault_badpeernet_interval\t16',
+]
 
 # Strings from ptp4l binary that look like config keys but aren't
 _SKIP_STRINGS = frozenset({
@@ -44,7 +64,7 @@ _SKIP_STRINGS = frozenset({
     'min_neighbor_prop_delay', 'ignore_transport_specific',
     'message_tag', 'in6addr_any', 'chmod', 'ethtool',
     'initial_delay', 'step_window', 'filter_weight', 'raw_weight',
-    'fault_badpeernet_interval', 'ts2phc',
+    'ts2phc',
     'activebackup', 'activeport',
     'rising', 'falling', 'moving_average', 'moving_median',
     'down', 'insert', 'delete',
@@ -113,11 +133,13 @@ class PTP4LConfig:
         try:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
 
-            # Filter out lines with unsupported params
+            # Filter out lines with unsupported params (nur aktive Keys –
+            # kommentierte Zeilen sind fuer ptp4l inert und werden
+            # mitsamt Kommentar erhalten)
             if self._supported is not None:
                 filtered = []
                 for line in self._lines:
-                    m = _KV_RE.match(line) or _COMMENTED_KV_RE.match(line)
+                    m = _KV_RE.match(line)
                     if m and m.group(1) not in self._supported:
                         continue
                     filtered.append(line)
@@ -132,20 +154,88 @@ class PTP4LConfig:
             raise PTP4LConfigError(f"Could not write {path}: {e}") from e
         self._modified = False
 
-    def get(self, key):
-        return self._data.get(key)
+    def get(self, key, section='global'):
+        return self._data.get(section, {}).get(key)
 
-    def set(self, key, value):
+    def find(self, key):
+        """(section, value) des ersten Vorkommens – sonst (None, None)."""
+        for section, data in self._data.items():
+            if key in data:
+                return section, data[key]
+        return None, None
+
+    def get_sections(self):
+        """Section-Header in Datei-Reihenfolge (nur im File vorhandene)."""
+        out = []
+        for line in self._lines:
+            m = _SECTION_HEADER_RE.match(line)
+            if m:
+                out.append(m.group(1))
+        return out
+
+    def ensure_section(self, name):
+        """Sorgt den Header [name] am Dateiende sicher an. False wenn da."""
+        if name in self.get_sections():
+            return False
+        while self._lines and self._lines[-1] == '':
+            self._lines.pop()
+        if self._lines:
+            self._lines.append('')
+        self._lines.append(f'[{name}]')
+        self._lines.append('')
+        self._data.setdefault(name, {})
+        self._line_map.setdefault(name, {})
+        self._modified = True
+        return True
+
+    def _section_bounds(self, section):
+        """(start, end) Line-Bereich der Section; end = naechster Header
+        bzw. Dateiende. None wenn die Section fehlt (ausser global)."""
+        header_idx = None
+        for idx, line in enumerate(self._lines):
+            m = _SECTION_HEADER_RE.match(line)
+            if not m:
+                continue
+            if header_idx is None and section == 'global' \
+                    and m.group(1) != section:
+                # global ohne eigenen Header: KVs vor erstem fremden Header
+                return (0, idx)
+            if m.group(1) == section:
+                header_idx = idx
+                break
+        if header_idx is None:
+            if section == 'global':
+                return (0, len(self._lines))
+            return None
+        end = len(self._lines)
+        for idx in range(header_idx + 1, len(self._lines)):
+            if _SECTION_HEADER_RE.match(self._lines[idx]):
+                end = idx
+                break
+        return (header_idx, end)
+
+    def _shift_line_maps(self, from_idx):
+        """Line-Indices nach einer Einfuegung ab from_idx +1 verschieben."""
+        for sec_map in self._line_map.values():
+            for key, idx in sec_map.items():
+                if idx >= from_idx:
+                    sec_map[key] = idx + 1
+
+    def set(self, key, value, section='global'):
         if self._supported is not None and key not in self._supported:
             return False
-        if key in self._line_map:
-            old = self._data.get(key)
-            if old == value:
+        sec_data = self._data.setdefault(section, {})
+        sec_map = self._line_map.setdefault(section, {})
+        if key in sec_map:
+            old = sec_data.get(key)
+            # Auch Typ-Vergleich: '16' (Andere-Tab) == 16 (geparst) –
+            # sonst schreibt set() die Zeile nur wegen Typ/Leerzeichen neu
+            if old == value or str(old) == str(value):
                 return False
-            self._data[key] = value
+            sec_data[key] = value
 
             # Update raw line
-            idx = self._line_map[key]
+            idx = sec_map[key]
             old_line = self._lines[idx]
             m = _KV_RE.match(old_line) or _COMMENTED_KV_RE.match(old_line)
             if m:
@@ -154,23 +244,31 @@ class PTP4LConfig:
             self._modified = True
             return True
 
-        # Key not in file – append new line at end
-        self._data[key] = value
-        self._lines.append(f"{key}\t{value}")
-        self._line_map[key] = len(self._lines) - 1
+        # Key nicht in der Section – am Ende der Section einfuegen
+        if section not in self.get_sections():
+            self.ensure_section(section)
+        bounds = self._section_bounds(section)
+        start, end = bounds
+        insert_at = end
+        while insert_at - 1 > start and self._lines[insert_at - 1].strip() == '':
+            insert_at -= 1
+        self._lines.insert(insert_at, f"{key}\t{value}")
+        self._shift_line_maps(insert_at)
+        sec_data[key] = value
+        sec_map[key] = insert_at
         self._modified = True
         return True
 
-    def get_comment_state(self, key):
+    def get_comment_state(self, key, section='global'):
         """Returns whether a parameter is commented out."""
-        idx = self._line_map.get(key)
+        idx = self._line_map.get(section, {}).get(key)
         if idx is None:
             return False
         return self._lines[idx].strip().startswith('#')
 
-    def set_comment_state(self, key, commented):
+    def set_comment_state(self, key, commented, section='global'):
         """Setzt einen Parameter aktiv oder kommentiert ihn aus."""
-        idx = self._line_map.get(key)
+        idx = self._line_map.get(section, {}).get(key)
         if idx is None:
             return False
         line = self._lines[idx]
@@ -185,11 +283,31 @@ class PTP4LConfig:
             return False
         return True
 
-    def reset_to_default(self):
+    def reset_to_default(self, preferred=None, available=None):
+        """Config auf Default zuruecksetzen.
+
+        Schreibt [global] aus der Default-Datei plus eine Interface-Section
+        mit den Defaults wie in der Referenz-Conf. Interface-Namenwahl:
+        preferred (Combo-Auswahl) wenn ptp-faehig, sonst erstes verfuegbares
+        ptp-faehiges Interface, sonst preferred als Fallback.
+        Liefert den verwendeten Interface-Namen oder None bei Fehler.
+        """
         if not os.path.exists(self.default_path):
-            return False
+            return None
         if not self._loaded_path or self._loaded_path == self.default_path:
-            return False
+            return None
+        if available is None:
+            try:
+                from core.net_interface import phc_interfaces
+                available = phc_interfaces()
+            except Exception:
+                available = []
+        if preferred and preferred in available:
+            iface = preferred
+        elif available:
+            iface = available[0]
+        else:
+            iface = preferred
         try:
             # Read default, filter unsupported params, write to target
             with open(self.default_path) as f:
@@ -202,15 +320,21 @@ class PTP4LConfig:
                     continue
                 filtered.append(line)
 
+            text = '\n'.join(filtered).rstrip('\n')
+            if iface:
+                text += f'\n\n[{iface}]\n'
+                for line in INTERFACE_DEFAULT_LINES:
+                    text += line + '\n'
+            if not text.endswith('\n'):
+                text += '\n'
+
             with open(self._loaded_path, 'w') as f:
-                f.write('\n'.join(filtered))
-                if not filtered[-1].endswith('\n'):
-                    f.write('\n')
+                f.write(text)
         except (OSError, PermissionError) as e:
             raise PTP4LConfigError(f"Could not reset: {e}") from e
         self._modified = True
         self.load(self._loaded_path)
-        return True
+        return iface
 
     def get_loaded_path(self):
         return self._loaded_path
@@ -230,18 +354,27 @@ class PTP4LConfig:
     # ─── Parsing ─────────────────────────────────────────────
 
     def _parse(self):
+        section = 'global'
+        self._data = {section: {}}
+        self._line_map = {section: {}}
         for idx, line in enumerate(self._lines):
+            m = _SECTION_HEADER_RE.match(line)
+            if m:
+                section = m.group(1)
+                self._data.setdefault(section, {})
+                self._line_map.setdefault(section, {})
+                continue
             m = _KV_RE.match(line)
             if m:
                 key, val = m.group(1), m.group(2).strip()
-                self._data[key] = self._parse_value(val)
-                self._line_map[key] = idx
+                self._data[section][key] = self._parse_value(val)
+                self._line_map[section][key] = idx
                 continue
             m = _COMMENTED_KV_RE.match(line)
             if m:
                 key, val = m.group(1), m.group(2).strip()
-                self._data[key] = self._parse_value(val)
-                self._line_map[key] = idx
+                self._data[section][key] = self._parse_value(val)
+                self._line_map[section][key] = idx
 
     def _parse_value(self, val):
         val = val.strip()

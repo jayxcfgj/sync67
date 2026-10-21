@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
+    QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QSplitter,
     QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
     QCheckBox, QComboBox, QPushButton,
     QFormLayout, QWidget, QScrollArea, QMessageBox, QTextEdit
@@ -200,10 +200,15 @@ def create_widget(param_def, current_value, on_change=None):
 # ─── Hauptdialog ──────────────────────────────────────────────
 
 class PTP4LConfigDialog(QDialog):
-    def __init__(self, config: PTP4LConfig, parent=None):
+    def __init__(self, config: PTP4LConfig, interface_name: str, parent=None):
         super().__init__(parent)
         self.config = config
+        # Interface-Section, die der PTP-Tab ausgewaehlt hat
+        self.interface_name = interface_name or ''
         self.widgets = {}
+        self._key_section = {}      # key -> 'global' oder Interface-Name
+        self._iface_pane_labels = []  # Header-Labels (bei Reset umbenennen)
+        self._other_key_section = {}  # Other-Tab: key -> Section
         self._has_changes = False
         self.setWindowTitle('PTP4L Config Editor')
         self.setMinimumSize(480, 300)
@@ -286,20 +291,49 @@ class PTP4LConfigDialog(QDialog):
         btn_layout.addWidget(reset_btn)
         layout.addLayout(btn_layout)
 
-    def _create_tab(self, section, tab_label):
+    def _make_pane(self, title, is_iface):
+        """Eine Spalte des Pro-Tab-Splits: Header + ScrollArea mit Form."""
+        box = QWidget()
+        v = QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        header = QLabel(title)
+        header.setStyleSheet(
+            'color: #e0e0e0; font-weight: bold; padding: 2px;'
+        )
+        if is_iface:
+            self._iface_pane_labels.append(header)
+        v.addWidget(header)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         content.setMinimumSize(0, 0)
         form = QFormLayout(content)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        scroll.setWidget(content)
+        v.addWidget(scroll)
+        return box, form
+
+    def _create_tab(self, section, tab_label):
+        """Tab mit zwei Spalten: Global links, Interface [name] rechts."""
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        glob_box, glob_form = self._make_pane('Global', False)
+        iface_box, iface_form = self._make_pane(
+            f'Interface [{self.interface_name}]', True)
+        iface_rows = 0
 
         params = get_params_for_section(section)
         for pdef in params:
-            val = self.config.get(pdef.key)
+            # Scope entscheidet, in welcher Section der Wert lebt
+            if pdef.scope == 'interface':
+                key_section = self.interface_name
+            else:
+                key_section = 'global'
+            val = self.config.get(pdef.key, key_section)
             container, pw = create_widget(pdef, val, on_change=self._mark_changes)
             self.widgets[pdef.key] = pw
             self.containers[pdef.key] = container
+            self._key_section[pdef.key] = key_section
 
             supported = self.config._supported is None or pdef.key in self.config._supported
             if not supported:
@@ -309,10 +343,30 @@ class PTP4LConfigDialog(QDialog):
                     label.setText(f"{pdef.label} (unsupported)")
                     label.setStyleSheet("color: #ff6b6b;")
 
-            form.addRow(container)
+            if pdef.scope == 'interface':
+                iface_form.addRow(container)
+                iface_rows += 1
+            else:
+                glob_form.addRow(container)
 
-        scroll.setWidget(content)
-        self.tabs.addTab(scroll, tab_label)
+        if not iface_rows:
+            hint = QLabel('No interface parameters in this section.')
+            hint.setStyleSheet('color: gray; padding: 12px;')
+            iface_form.addRow(hint)
+
+        splitter.addWidget(glob_box)
+        splitter.addWidget(iface_box)
+        splitter.setSizes([1, 1])
+        self.tabs.addTab(splitter, tab_label)
+
+    def _set_interface_name(self, name):
+        """Interface-Section umbenennen (naechster Reset mit anderem NIC)."""
+        self.interface_name = name
+        for key in list(self._key_section):
+            if self._key_section[key] != 'global':
+                self._key_section[key] = name
+        for lbl in self._iface_pane_labels:
+            lbl.setText(f'Interface [{name}]')
 
     def _create_other_tab(self):
         meta_keys = {p.key for p in CONFIG_PARAMS}
@@ -355,10 +409,12 @@ class PTP4LConfigDialog(QDialog):
                 "border: 1px solid #555; }"
             )
 
-            # Pre-populate with any values already in the config
+            # Pre-populate with any values already in the config (merkt
+            # sich, in welcher Section der Key steht, fuer spaeteres Save)
             lines = []
             for key in unknown:
-                val = self.config.get(key)
+                sec, val = self.config.find(key)
+                self._other_key_section[key] = sec or 'global'
                 if val is not None:
                     lines.append(f"{key}\t{format_value(val)}")
             if not lines:
@@ -401,19 +457,22 @@ class PTP4LConfigDialog(QDialog):
                 # Handle SlaveOnly/MasterOnly as bool-int
                 if isinstance(value, bool):
                     value = 1 if value else 0
-                if not self.config.set(pdef.key, value):
+                key_section = self._key_section.get(key, 'global')
+                if not self.config.set(pdef.key, value, key_section):
                     if (self.config._supported is not None
                             and pdef.key not in self.config._supported):
                         skipped.append(pdef.key)
 
-            # Parse Other tab params
+            # Parse Other tab params (zurueck in ihre Ursprungs-Section)
             if self._other_text is not None:
                 for line in self._other_text.toPlainText().split('\n'):
                     line = line.strip()
                     m = _KV_RE.match(line)
                     if m:
                         key, val = m.group(1), m.group(2).strip()
-                        self.config.set(key, val)
+                        self.config.set(
+                            key, val,
+                            self._other_key_section.get(key, 'global'))
 
             self.config.save()
 
@@ -451,10 +510,15 @@ class PTP4LConfigDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
-            self.config.reset_to_default()
-            self.config.load(self.config.get_loaded_path())
-            QMessageBox.information(self, 'Reset', 'Config reset to Default.')
+            # Interface: Combo-Auswahl wenn ptp-faehig, sonst Scan
+            iface = self.config.reset_to_default(self.interface_name)
+            if iface is None:
+                QMessageBox.critical(
+                    self, 'Error', 'Reset failed: default config missing.')
+                return
+            self._set_interface_name(iface)
             self._reload_widgets()
+            QMessageBox.information(self, 'Reset', 'Config reset to Default.')
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Reset failed:\n{e}')
 
@@ -505,7 +569,7 @@ class PTP4LConfigDialog(QDialog):
 
     def _reload_widgets(self):
         for key, pw in self.widgets.items():
-            val = self.config.get(key)
+            val = self.config.get(key, self._key_section.get(key, 'global'))
             if val is not None:
                 pw.set_value(val)
         self._update_pi_param_states()
