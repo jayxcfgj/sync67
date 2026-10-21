@@ -27,11 +27,14 @@ class ParamDef:
 # Interface-Section AKTIV stehen (Referenz: dort "funktionieren" die Werte).
 # time_stamping fehlt mit Absicht: dort nur kommentiert – ptp4l akzeptiert
 # den Key nicht aktiv in der Interface-Section, er gehoert nach [global].
+# phc_index ist entgegen der Referenz-Conf bewusst interface-scope: pro
+# Section noetig, sonst 'PHC device mismatch' bei mehreren NICs (ptp4l v4.
+# oeffnet Config-Port-Sections auch ohne -i).
 INTERFACE_META_KEYS = frozenset({
     'delay_mechanism', 'network_transport',
     'delayAsymmetry', 'logMinPdelayReqInterval', 'logMinDelayReqInterval',
     'logSyncInterval', 'logAnnounceInterval', 'announceReceiptTimeout',
-    'fault_reset_interval', 'fault_badpeernet_interval',
+    'fault_reset_interval', 'fault_badpeernet_interval', 'phc_index',
 })
 
 
@@ -555,7 +558,13 @@ CONFIG_PARAMS = [
              section='Interface'),
     ParamDef('phc_index', 'int', -1,
              label='PHC Index',
-             tooltip='Index of the PTP hardware clock.\n-1 = automatic.',
+             tooltip='PTP hardware clock index for this port.\n'
+                     'Check with: ethtool -T <iface> ("PTP Hardware Clock").\n'
+                     'Must match the NIC\'s PHC – otherwise ptp4l aborts\n'
+                     'with "PHC device mismatch" when another interface\n'
+                     'in the system uses a different PHC (ptp4l opens\n'
+                     'config port sections even without -i).\n'
+                     '-1 = automatic (PHC attached to the interface).',
              section='Interface', min_val=-1, max_val=255),
     ParamDef('productDescription', 'string', ';;',
              label='Product Description',

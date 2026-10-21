@@ -8,7 +8,7 @@ Covered:
   4) Save-Roundtrip: Struktur (Header + Keys) bleibt erhalten
   5) Unbekannte Interface-Keys ueberleben save() (fault_badpeernet_interval)
   6) reset_to_default: Combo-Interface bevorzugt, sonst erstes ptp-faehiges,
-     Interface-Defaults wie in aktueller conf, kein phc_index
+     Interface-Defaults wie in aktueller conf, phc_index mit aufgeloestem Wert
   7) Meta-Scope: genau die conf-Belegten Keys sind 'interface'
   8) Dialog: Pro-Tab-Split (Global | Interface [name]), Apply schreibt in
      die richtige Section
@@ -186,6 +186,9 @@ def check_ensure_section():
         check("vorhandene Section: False",
               cfg.ensure_section("enp37s0") is False)
         check("neue Section: True", cfg.ensure_section("enp99s0") is True)
+        check("neue Section hat phc_index (auto/-1 bei unbekanntem iface)",
+              cfg.get("phc_index", "enp99s0") is not None,
+              repr(cfg.get("phc_index", "enp99s0")))
         cfg.set("delay_mechanism", "P2P", "enp99s0")
         cfg.save()
         c2 = load_cfg(path)
@@ -198,6 +201,28 @@ def check_ensure_section():
 
 
 # ── 4) Save-Roundtrip ─────────────────────────────────────────
+
+def check_set_creates_section():
+    print("3b) set() legt Section an: In-Memory konsistent, kein Duplikat")
+    d = tmpdir()
+    try:
+        path = write_cfg(d)
+        cfg = load_cfg(path)
+        cfg.set("logSyncInterval", 0, "enp88s88")
+        check("In-Memory get() nach set()-Anlage",
+              cfg.get("logSyncInterval", "enp88s88") == 0,
+              repr(cfg.get("logSyncInterval", "enp88s88")))
+        cfg.set("logSyncInterval", -3, "enp88s88")
+        cfg.save()
+        c2 = load_cfg(path)
+        n = section_text(path, "enp88s88").count("logSyncInterval\t")
+        check("keine Duplikatzeile nach Update", n == 1, n)
+        check("Wert im File aktualisiert",
+              c2.get("logSyncInterval", "enp88s88") == -3,
+              repr(c2.get("logSyncInterval", "enp88s88")))
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 
 def check_save_roundtrip():
     print("4) Save-Roundtrip: Section-Struktur bleibt")
@@ -265,8 +290,14 @@ def check_reset_creates_interface_section():
                   f"got {c2.get(key, 'enp37s0')!r}, in file: {key in stext}")
         check("time_stamping kommentiert wie in aktueller conf",
               "# time_stamping" in stext, stext[:200])
-        check("phc_index NICHT in Interface-Section",
-              "phc_index" not in stext)
+        from core.net_interface import phc_index
+        check("phc_index in Interface-Section (mismatch-Vermeidung)",
+              "phc_index" in stext, stext[:300])
+        check("phc_index = aufgeloester PHC-Index des gewaehlten Iface",
+              c2.get("phc_index", iface) is not None
+              and str(c2.get("phc_index", iface)) == str(phc_index(iface)),
+              f"conf={c2.get('phc_index', iface)!r}, "
+              f"ethtool={phc_index(iface)}")
 
         # Combo ptp-faehig -> Combo gewinnt
         iface2 = cfg.reset_to_default("enp37s0", ["enp37s0", "enp99s0"])
@@ -302,6 +333,15 @@ def check_meta_scope():
           and PARAM_MAP["fault_badpeernet_interval"].scope == "interface",
           repr(PARAM_MAP.get("fault_badpeernet_interval")
                and PARAM_MAP["fault_badpeernet_interval"].scope))
+    check("phc_index in INTERFACE_META_KEYS (interface-scope)",
+          "phc_index" in INTERFACE_META_KEYS)
+    check("phc_index ParamDef scope=interface",
+          "phc_index" in PARAM_MAP
+          and PARAM_MAP["phc_index"].scope == "interface",
+          repr(PARAM_MAP.get("phc_index") and PARAM_MAP["phc_index"].scope))
+    keys = [p.key for p in CONFIG_PARAMS]
+    dupes = sorted({k for k in keys if keys.count(k) > 1})
+    check("keine doppelten ParamDefs", not dupes, dupes)
 
 
 # ── 8) Dialog ─────────────────────────────────────────────────
@@ -329,6 +369,9 @@ def check_dialog_two_columns():
         check("Interface-Label traegt Namen",
               any("enp37s0" in lbl.text() for lbl in dlg._iface_pane_labels),
               [lbl.text() for lbl in dlg._iface_pane_labels])
+        check("phc_index in Interface-Pane",
+              dlg._key_section.get("phc_index") == "enp37s0",
+              repr(dlg._key_section.get("phc_index")))
 
         # Werte aus der richtigen Section gelesen?
         check("Interface-Wert gelesen",
@@ -484,6 +527,7 @@ def main():
     check_parse_sections()
     check_set_per_section()
     check_ensure_section()
+    check_set_creates_section()
     check_save_roundtrip()
     check_unknown_iface_key_survives()
     check_reset_creates_interface_section()

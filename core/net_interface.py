@@ -6,9 +6,37 @@ Auf jedem Rechner kann die NIC anders heissen; die PTP-Hardware-Uhr
 
 
 import os
+import re
+import subprocess
 from pathlib import Path
 
 PTP_SYSFS = '/sys/class/ptp'
+
+
+def phc_index(iface, path=PTP_SYSFS):
+    """PHC-Index des Interfaces wie in `ethtool -T`, -1 wenn unbekannt.
+
+    ptp4l braucht den Wert pro Interface-Section, sonst schlaegt der Start
+    mit 'PHC device mismatch' fehl, wenn mehrere NICs im System sind.
+    """
+    if not iface:
+        return -1
+    try:
+        out = subprocess.run(['ethtool', '-T', iface],
+                             capture_output=True, text=True, timeout=5)
+        m = re.search(r'PTP Hardware Clock:\s*(\d+)', out.stdout)
+        if m:
+            return int(m.group(1))
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        for ptp in sorted(Path(path).glob('ptp*')):
+            net = ptp / 'device' / 'net'
+            if net.is_dir() and iface in os.listdir(net):
+                return int(ptp.name.replace('ptp', ''))
+    except (OSError, ValueError):
+        pass
+    return -1
 
 
 def phc_interfaces(path=PTP_SYSFS):

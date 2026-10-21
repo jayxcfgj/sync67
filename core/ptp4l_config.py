@@ -10,6 +10,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from core.net_interface import phc_index
+
 
 class PTP4LConfigError(Exception):
     ...
@@ -174,7 +176,12 @@ class PTP4LConfig:
         return out
 
     def ensure_section(self, name):
-        """Sorgt den Header [name] am Dateiende sicher an. False wenn da."""
+        """Sorgt den Header [name] am Dateiende sicher an. False wenn da.
+
+        Neue Sections bekommen sofort `phc_index` (aufgeloest ueber
+        ethtool -T / Sysfs, -1 = auto) – ohne den Wert scheitert ptp4l
+        bei mehreren NICs mit 'PHC device mismatch'.
+        """
         if name in self.get_sections():
             return False
         while self._lines and self._lines[-1] == '':
@@ -182,9 +189,9 @@ class PTP4LConfig:
         if self._lines:
             self._lines.append('')
         self._lines.append(f'[{name}]')
+        self._lines.append(f'phc_index\t{phc_index(name)}')
         self._lines.append('')
-        self._data.setdefault(name, {})
-        self._line_map.setdefault(name, {})
+        self._parse()
         self._modified = True
         return True
 
@@ -247,6 +254,9 @@ class PTP4LConfig:
         # Key nicht in der Section – am Ende der Section einfuegen
         if section not in self.get_sections():
             self.ensure_section(section)
+            # ensure_section parst neu -> Referenzen neu holen
+            sec_data = self._data.setdefault(section, {})
+            sec_map = self._line_map.setdefault(section, {})
         bounds = self._section_bounds(section)
         start, end = bounds
         insert_at = end
@@ -325,6 +335,7 @@ class PTP4LConfig:
                 text += f'\n\n[{iface}]\n'
                 for line in INTERFACE_DEFAULT_LINES:
                     text += line + '\n'
+                text += f'phc_index\t{phc_index(iface)}\n'
             if not text.endswith('\n'):
                 text += '\n'
 
