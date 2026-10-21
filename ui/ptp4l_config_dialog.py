@@ -17,6 +17,7 @@ from core.ptp4l_config import PTP4LConfig, format_value, _KV_RE
 from core.ptp4l_config_meta import (
     CONFIG_PARAMS, PARAM_MAP, SECTION_ORDER, get_params_for_section
 )
+from core.net_interface import phc_index
 from PyQt6.QtWidgets import QApplication
 
 
@@ -320,6 +321,21 @@ class PTP4LConfigDialog(QDialog):
         v.addWidget(scroll)
         return box, form
 
+    def _effective_value(self, key, key_section):
+        """Widget-Wert: Config-Wert, sonst sinnvoller Fallback."""
+        val = self.config.get(key, key_section)
+        if val is not None:
+            return val
+        if key_section == 'global':
+            return None
+        if key == 'phc_index':
+            # Interface-Section ohne Wert: echten PHC-Index der NIC
+            # zeigen (ethtool-T), nicht den Global-Fallback -1
+            return phc_index(key_section)
+        # Interface-Section (noch) ohne den Key: den aktuellen
+        # Global-Wert zeigen – das ist, was ptp4l bisher wirkt
+        return self.config.get(key, 'global')
+
     def _create_tab(self, section, tab_label):
         """Tab mit zwei Spalten: Global links, Interface [name] rechts."""
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -335,11 +351,7 @@ class PTP4LConfigDialog(QDialog):
                 key_section = self.interface_name
             else:
                 key_section = 'global'
-            val = self.config.get(pdef.key, key_section)
-            if val is None and key_section != 'global':
-                # Interface-Section (noch) ohne den Key: den aktuellen
-                # Global-Wert zeigen – das ist, was ptp4l bisher wirkt
-                val = self.config.get(pdef.key, 'global')
+            val = self._effective_value(pdef.key, key_section)
             container, pw = create_widget(pdef, val, on_change=self._mark_changes)
             self.widgets[pdef.key] = pw
             self.containers[pdef.key] = container
@@ -497,6 +509,13 @@ class PTP4LConfigDialog(QDialog):
                             key, val,
                             self._other_key_section.get(key, 'global'))
 
+            # Fehlende phc_index-Werte in ALLEN Interface-Sections
+            # nachziehen (ptp4l oeffnet Config-Port-Sections auch ohne
+            # -i; eine Section ohne Wert riskiert PHC device mismatch)
+            for sec in self.config.get_sections():
+                if sec != 'global' and self.config.get('phc_index', sec) is None:
+                    self.config.set('phc_index', phc_index(sec), sec)
+
             self.config.save()
 
             if skipped:
@@ -593,9 +612,7 @@ class PTP4LConfigDialog(QDialog):
     def _reload_widgets(self):
         for key, pw in self.widgets.items():
             section = self._key_section.get(key, 'global')
-            val = self.config.get(key, section)
-            if val is None and section != 'global':
-                val = self.config.get(key, 'global')
+            val = self._effective_value(key, section)
             if val is not None:
                 pw.set_value(val)
         self._update_pi_param_states()

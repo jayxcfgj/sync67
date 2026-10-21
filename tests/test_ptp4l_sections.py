@@ -372,6 +372,11 @@ def check_dialog_two_columns():
         check("phc_index in Interface-Pane",
               dlg._key_section.get("phc_index") == "enp37s0",
               repr(dlg._key_section.get("phc_index")))
+        from core.net_interface import phc_index
+        check("phc_index zeigt aufgeloesten Wert (nicht Global-Fallback -1)",
+              dlg.widgets["phc_index"].get_value() == phc_index("enp37s0"),
+              f"widget={dlg.widgets['phc_index'].get_value()!r}, "
+              f"ethtool={phc_index('enp37s0')}")
 
         # Werte aus der richtigen Section gelesen?
         check("Interface-Wert gelesen",
@@ -387,6 +392,16 @@ def check_dialog_two_columns():
         check("Interface-Section gesetzt",
               c2.get("network_transport", "enp37s0") == "L2",
               repr(c2.get("network_transport", "enp37s0")))
+        check("Apply haelt fehlendes phc_index in bestehender Section nach",
+              c2.get("phc_index", "enp37s0") is not None
+              and str(c2.get("phc_index", "enp37s0")) == str(phc_index("enp37s0")),
+              f"conf={c2.get('phc_index', 'enp37s0')!r}, "
+              f"ethtool={phc_index('enp37s0')}")
+        check("Apply healt AUCH andere Interface-Sections (Mismatch-Schutz)",
+              c2.get("phc_index", "enp34s0") is not None
+              and str(c2.get("phc_index", "enp34s0")) == str(phc_index("enp34s0")),
+              f"conf={c2.get('phc_index', 'enp34s0')!r}, "
+              f"ethtool={phc_index('enp34s0')}")
         check("Global-Section NICHT angetastet",
               c2.get("network_transport", "global") == "UDPv4",
               repr(c2.get("network_transport", "global")))
