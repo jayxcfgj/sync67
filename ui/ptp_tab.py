@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QComboBox, QPushButton, QTextEdit,
-                               QGroupBox, QFormLayout, QScrollArea)
+                               QGroupBox, QFormLayout, QScrollArea, QCheckBox)
 from PyQt6.QtCore import Qt, QProcess, QSettings, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
 import os
@@ -202,7 +202,14 @@ class PTPTab(QWidget):
 
         # ptp4l terminal
         ptp4l_terminal_wrap = QVBoxLayout()
-        ptp4l_terminal_wrap.addWidget(QLabel("PTP4L Output:"))
+        out_header = QHBoxLayout()
+        self.verbose_cb = QCheckBox("Verbose (log level 7)")
+        self.verbose_cb.setStyleSheet("font-size: 11px;")
+        out_header.addWidget(self.verbose_cb)
+        out_header.addSpacing(8)
+        out_header.addWidget(QLabel("PTP4L Output:"))
+        out_header.addStretch()
+        ptp4l_terminal_wrap.addLayout(out_header)
         self.terminal_output = QTextEdit()
         self.terminal_output.setReadOnly(True)
         self.terminal_output.setFont(QFont("Courier New", 10))
@@ -299,10 +306,34 @@ class PTPTab(QWidget):
             settings.setValue("selected_interface", iface)
         # Änderungen speichern
         self.interface_combo.currentIndexChanged.connect(self._save_interface)
+        # Init-Aktivierung: Connect passiert nach setCurrentIndex, daher
+        # einmalig die ausgewählte Sektion freischalten (idempotent)
+        self._activate_interface_section(self.interface_combo.currentText())
 
     def _save_interface(self):
-        settings = QSettings("sync67", "ptp_settings")
-        settings.setValue("selected_interface", self.interface_combo.currentText())
+        iface = self.interface_combo.currentText()
+        QSettings("sync67", "ptp_settings").setValue("selected_interface", iface)
+        self._activate_interface_section(iface)
+
+    def _activate_interface_section(self, iface):
+        """Andere Interface-Sektionen in ptp4l.conf auskommentieren.
+
+        Nur die zur Combo-Auswahl passende Sektion bleibt aktiv – ptp4l
+        oeffnet sonst bei mehreren NICs beide Ports und springt hin und
+        her (PHC-Hin-und-Her bei Log-Level 7 beobachtet).
+        """
+        if not iface or iface.startswith("Error"):
+            return
+        try:
+            from core.ptp4l_config import PTP4LConfig
+            cfg = PTP4LConfig()
+            cfg.load("/etc/linuxptp/ptp4l.conf")
+            cfg.activate_interface(iface)
+            cfg.save()
+        except Exception as e:
+            self.terminal_output.append(
+                f"Warning: could not activate interface section "
+                f"[{iface}] in ptp4l.conf: {e}")
 
     def open_settings(self):
         from ui.settings_dialog import SettingsDialog
@@ -550,8 +581,14 @@ class PTPTab(QWidget):
         else:
             self._start_ptp4l(self.iface)
 
+    def _ptp4l_command(self, iface):
+        """ptp4l-Kommandozeile: -l 7 wenn Verbose-Checkbox gesetzt, sonst 6."""
+        level = 7 if self.verbose_cb.isChecked() else 6
+        return (f"sudo ptp4l -f /etc/linuxptp/ptp4l.conf "
+                f"-i {iface} -m -l {level} -H")
+
     def _start_ptp4l(self, iface):
-        ptp_cmd = f"sudo ptp4l -f /etc/linuxptp/ptp4l.conf -i {iface} -m -l 6 -H"
+        ptp_cmd = self._ptp4l_command(iface)
         self.terminal_output.insertPlainText(f"\nRunning: {ptp_cmd}\n")
         _trim_terminal(self.terminal_output)
         scrollbar = self.terminal_output.verticalScrollBar()

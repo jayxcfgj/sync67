@@ -23,6 +23,13 @@ _COMMENTED_KV_RE = re.compile(r'^#\s*(\w[\w.]*)\s+(.+)$')
 _SECTION_RE = re.compile(r'^#\s+[A-Z]')
 _SECTION_HEADER_RE = re.compile(r'^\[([^\]]+)\]\s*$')
 
+# Marker fuer von sync67 auskommentierte Interface-Sektionen.
+# Eigener Prefix statt einfachem '# ' – der Round-Trip A->B->A ist
+# byte-identisch und User-Kommentare wie '# time_stamping' ueberleben.
+_MARKER = '# sync67-off '
+_MARKER_HEADER_RE = re.compile(
+    r'^' + re.escape(_MARKER) + r'\[([^\]]+)\]\s*$')
+
 # Interface-Section-Defaults: exakt wie in der aktuellen
 # /etc/linuxptp/ptp4l.conf unter [enp37s0] (Referenz: dort funktionieren
 # die Werte). time_stamping bleibt bewusst kommentiert, damit der
@@ -194,6 +201,48 @@ class PTP4LConfig:
         self._parse()
         self._modified = True
         return True
+
+    def activate_interface(self, iface):
+        """Kommentiert alle Interface-Sektionen ausser [global] und `iface`
+        zeilenweise mit Marker '# sync67-off ', Zielsektion wird
+        freigeschaltet. Idempotent; wirft PTP4LConfigError wenn nicht
+        geladen. Nach Aufruf save() nicht vergessen.
+        """
+        if self._loaded_path is None:
+            raise PTP4LConfigError("Not loaded")
+        out = []
+        current = None  # Name der aktuellen Sektion (aktiv oder Marker)
+        for line in self._lines:
+            m = _SECTION_HEADER_RE.match(line)
+            if m:
+                current = m.group(1)
+                if current == 'global' or current == iface:
+                    out.append(line)
+                else:
+                    out.append(_MARKER + line)
+                continue
+            m = _MARKER_HEADER_RE.match(line)
+            if m:
+                current = m.group(1)
+                if current == iface:
+                    out.append(line[len(_MARKER):])
+                else:
+                    out.append(line)
+                continue
+            if current is None or current == 'global':
+                out.append(line)
+            elif current == iface:
+                out.append(
+                    line[len(_MARKER):] if line.startswith(_MARKER) else line)
+            else:
+                # Andere Interface-Sektion: auskommentieren (falls nicht schon)
+                out.append(
+                    line if (not line or line.startswith(_MARKER))
+                    else _MARKER + line)
+        if out != self._lines:
+            self._lines = out
+            self._parse()
+            self._modified = True
 
     def _section_bounds(self, section):
         """(start, end) Line-Bereich der Section; end = naechster Header

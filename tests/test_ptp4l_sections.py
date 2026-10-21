@@ -241,6 +241,79 @@ def check_save_roundtrip():
         shutil.rmtree(d, ignore_errors=True)
 
 
+# ── 4b) activate_interface ────────────────────────────────────
+
+
+def check_activate_interface():
+    print("4b) activate_interface: eine aktive Sektion, Round-Trip sauber")
+    d = tmpdir()
+    try:
+        path = write_cfg(d)
+        original = open(path).read()
+        cfg = load_cfg(path)
+        cfg.activate_interface("enp37s0")
+        cfg.save()
+        text = open(path).read()
+        check("enp37s0-Header aktiv", "\n[enp37s0]\n" in text, repr(text[:200]))
+        check("enp34s0-Header auskommentiert",
+              "# sync67-off [enp34s0]" in text)
+        check("enp34s0-Keys auskommentiert",
+              "# sync67-off delay_mechanism\tP2P" in text)
+        check("[global] unberuehrt", "[global]\npriority1\t128" in text)
+        c2 = load_cfg(path)
+        check("nur globale + enp37s0-Sektionen sichtbar",
+              c2.get_sections() == ["global", "enp37s0"],
+              repr(c2.get_sections()))
+        check("enp34s0-Wert weg aus _data",
+              c2.get("delay_mechanism", "enp34s0") is None)
+        s1 = text  # Zustand nach erstem Mal A aktiv
+
+        # Wechsel zu B: nur B aktiv, A auskommentiert (Round-Trip-Basis)
+        cfg2 = load_cfg(path)
+        cfg2.activate_interface("enp34s0")
+        cfg2.save()
+        t2 = open(path).read()
+        check("enp34s0 jetzt aktiv", "\n[enp34s0]\n" in t2)
+        check("enp37s0 jetzt auskommentiert",
+              "# sync67-off [enp37s0]" in t2)
+        check("enp37s0-User-Kommentar mitmarkiert",
+              "# sync67-off # time_stamping\thardware" in t2)
+
+        # Rueckweg zu A: muss exakt s1 ergeben (Round-Trip stabil)
+        cfg3 = load_cfg(path)
+        cfg3.activate_interface("enp37s0")
+        cfg3.save()
+        t3 = open(path).read()
+        check("Round-Trip A->B->A == A", t3 == s1,
+              f"len {len(t3)} vs {len(s1)}")
+
+        # Idempotenz: zweimal gleiche Wahl = kein Unterschied
+        cfg4 = load_cfg(path)
+        cfg4.activate_interface("enp37s0")
+        cfg4.save()
+        check("Idempotenz (zweimal gleiche Wahl)",
+              open(path).read() == s1)
+
+        # User-Kommentar ueberlebt den Round-Trip
+        d2 = tmpdir()
+        try:
+            path2 = write_cfg(d2, FIXTURE + "\n")
+            # time_stamping ist in FIXTURE als Kommentar in enp37s0
+            cfg5 = load_cfg(path2)
+            cfg5.activate_interface("enp34s0")
+            cfg5.save()
+            cfg6 = load_cfg(path2)
+            cfg6.activate_interface("enp37s0")
+            cfg6.save()
+            t_rt = open(path2).read()
+            check("User-Kommentar # time_stamping ueberlebt",
+                  "# time_stamping\thardware" in t_rt, repr(t_rt))
+        finally:
+            shutil.rmtree(d2, ignore_errors=True)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 # ── 5) Unbekannte Interface-Keys ──────────────────────────────
 
 def check_unknown_iface_key_survives():
@@ -544,6 +617,7 @@ def main():
     check_ensure_section()
     check_set_creates_section()
     check_save_roundtrip()
+    check_activate_interface()
     check_unknown_iface_key_survives()
     check_reset_creates_interface_section()
     check_meta_scope()

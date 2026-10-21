@@ -140,6 +140,26 @@ def check_tab_sync():
             qs.remove("selected_interface")
 
 
+def check_ptp4l_command_verbose():
+    print("7) _ptp4l_command: -l 6 default, -l 7 bei Verbose-Checkbox")
+    tab = PTPTab()
+    try:
+        tab.verbose_cb.setChecked(False)
+        cmd = tab._ptp4l_command("enp37s0")
+        check("default -l 6", "-l 6" in cmd, cmd)
+        check("default ohne -l 7", "-l 7" not in cmd, cmd)
+        tab.verbose_cb.setChecked(True)
+        cmd7 = tab._ptp4l_command("enp37s0")
+        check("verbose -l 7", "-l 7" in cmd7, cmd7)
+        check("verbose ohne -l 6", "-l 6" not in cmd7, cmd7)
+        check("Command-Struktur erhalten",
+              cmd7.startswith("sudo ptp4l -f /etc/linuxptp/ptp4l.conf")
+              and "-i enp37s0" in cmd7 and "-m" in cmd7 and "-H" in cmd7,
+              cmd7)
+    finally:
+        tab.deleteLater()
+
+
 def main():
     app = QApplication.instance() or QApplication([])
 
@@ -149,6 +169,7 @@ def main():
     check_empty()
     check_phc_scan()
     check_tab_sync()
+    check_ptp4l_command_verbose()
 
     print("FAILS: NONE" if not FAILS else f"FAILS: {FAILS}")
     sys.exit(1 if FAILS else 0)
