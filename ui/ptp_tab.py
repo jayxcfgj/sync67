@@ -348,57 +348,7 @@ class PTPTab(QWidget):
 
             self._ensure_uds_dir()
 
-            settings = QSettings("sync67", "ptp_settings")
-            gro_off = settings.value("gro_off", True, type=bool)
-            gso_off = settings.value("gso_off", True, type=bool)
-            tso_off = settings.value("tso_off", True, type=bool)
-            sg_off = settings.value("sg_off", True, type=bool)
-            rx_usecs_0 = settings.value("rx_usecs_0", True, type=bool)
-            multicast_on = settings.value("multicast_on", True, type=bool)
-            phc_reset = settings.value("phc_reset", True, type=bool)
-            mcast_event = settings.value("mcast_event", True, type=bool)
-            mcast_pdelay = settings.value("mcast_pdelay", True, type=bool)
-            wol_d = settings.value("wol_d", True, type=bool)
-
-            commands = []
-
-            # System clock services (stopped BEFORE PTP starts)
-            if settings.value("stop_timesyncd", True, type=bool):
-                commands.append("sudo systemctl stop systemd-timesyncd")
-            if settings.value("stop_chronyd", True, type=bool):
-                commands.append("sudo systemctl stop chronyd")
-            if settings.value("stop_ntpd", True, type=bool):
-                commands.append("sudo systemctl stop ntp")
-            if settings.value("stop_sys_time_wait", True, type=bool):
-                commands.append("sudo systemctl stop systemd-time-wait-sync")
-
-            if phc_reset:
-                phc_dev = self._get_phc_device(iface)
-                if phc_dev:
-                    commands.append(f"sudo phc_ctl {phc_dev} set")
-                else:
-                    self.terminal_output.insertPlainText(
-                        f"⚠ Could not determine PHC device for {iface}, skipping phc_ctl\n"
-                    )
-            if wol_d:
-                commands.append(f"sudo ethtool -s {iface} wol d")
-            if gro_off:
-                commands.append(f"sudo ethtool -K {iface} gro off")
-            if gso_off:
-                commands.append(f"sudo ethtool -K {iface} gso off")
-            if tso_off:
-                commands.append(f"sudo ethtool -K {iface} tso off")
-            if sg_off:
-                commands.append(f"sudo ethtool -K {iface} sg off")
-            if rx_usecs_0:
-                commands.append(f"sudo ethtool -C {iface} rx-usecs 0")
-            if mcast_event:
-                commands.append(f"sudo ip maddr add 01:1B:19:00:00:00 dev {iface}")
-            if mcast_pdelay:
-                commands.append(f"sudo ip maddr add 01:80:C2:00:00:0E dev {iface}")
-            if multicast_on:
-                commands.append(f"sudo ip link set {iface} multicast on")
-
+            commands = self._build_pre_ptp4l_commands(iface)
             if commands:
                 self.run_commands(commands, iface)
             else:
@@ -407,6 +357,70 @@ class PTPTab(QWidget):
         except Exception as e:
             self.terminal_output.append(f"Error: {str(e)}")
             self.terminal_output.append(traceback.format_exc())
+
+    def _build_pre_ptp4l_commands(self, iface):
+        """Alle Vorkommandos vor dem ptp4l-Start (Start-Optionen-Reihenfolge)."""
+        settings = QSettings("sync67", "ptp_settings")
+        gro_off = settings.value("gro_off", True, type=bool)
+        gso_off = settings.value("gso_off", True, type=bool)
+        tso_off = settings.value("tso_off", True, type=bool)
+        sg_off = settings.value("sg_off", True, type=bool)
+        rx_usecs_0 = settings.value("rx_usecs_0", True, type=bool)
+        multicast_on = settings.value("multicast_on", True, type=bool)
+        phc_reset = settings.value("phc_reset", True, type=bool)
+        mcast_event = settings.value("mcast_event", True, type=bool)
+        mcast_pdelay = settings.value("mcast_pdelay", True, type=bool)
+        wol_d = settings.value("wol_d", True, type=bool)
+        hwstamp_filter = settings.value("hwstamp_filter", True, type=bool)
+
+        commands = []
+
+        # System clock services (stopped BEFORE PTP starts)
+        if settings.value("stop_timesyncd", True, type=bool):
+            commands.append("sudo systemctl stop systemd-timesyncd")
+        if settings.value("stop_chronyd", True, type=bool):
+            commands.append("sudo systemctl stop chronyd")
+        if settings.value("stop_ntpd", True, type=bool):
+            commands.append("sudo systemctl stop ntp")
+        if settings.value("stop_sys_time_wait", True, type=bool):
+            commands.append("sudo systemctl stop systemd-time-wait-sync")
+
+        if phc_reset:
+            phc_dev = self._get_phc_device(iface)
+            if phc_dev:
+                commands.append(f"sudo phc_ctl {phc_dev} set")
+            else:
+                self.terminal_output.insertPlainText(
+                    f"⚠ Could not determine PHC device for {iface}, skipping phc_ctl\n"
+                )
+        if wol_d:
+            commands.append(f"sudo ethtool -s {iface} wol d")
+        if gro_off:
+            commands.append(f"sudo ethtool -K {iface} gro off")
+        if gso_off:
+            commands.append(f"sudo ethtool -K {iface} gso off")
+        if tso_off:
+            commands.append(f"sudo ethtool -K {iface} tso off")
+        if sg_off:
+            commands.append(f"sudo ethtool -K {iface} sg off")
+        if rx_usecs_0:
+            commands.append(f"sudo ethtool -C {iface} rx-usecs 0")
+        if mcast_event:
+            commands.append(f"sudo ip maddr add 01:1B:19:00:00:00 dev {iface}")
+        if mcast_pdelay:
+            commands.append(f"sudo ip maddr add 01:80:C2:00:00:0E dev {iface}")
+        if multicast_on:
+            commands.append(f"sudo ip link set {iface} multicast on")
+        if hwstamp_filter:
+            if shutil.which("hwstamp_ctl"):
+                commands.append(f"sudo hwstamp_ctl -i {iface} -t 1 -r 12")
+                commands.append(f"sudo hwstamp_ctl -i {iface}")
+            else:
+                self.terminal_output.insertPlainText(
+                    "⚠ hwstamp_ctl not found, skipping HW timestamp filter\n"
+                )
+
+        return commands
 
     def _get_phc_device(self, iface):
         """Determine the PHC device for a network interface via ethtool -T.

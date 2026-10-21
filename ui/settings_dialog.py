@@ -66,6 +66,14 @@ class SettingsDialog(QDialog):
             "On Intel i210/i211 NICs, WoL shares PHY resources with\n"
             "PTP TX timestamping. With WoL on, timestamps may not\n"
             "reach the app, causing 'master sync timeout'.")
+        self.hwstamp_check = QCheckBox("Set HW timestamp filter (hwstamp_ctl -t 1 -r 12)")
+        self.hwstamp_check.setToolTip(
+            "Sets the driver-level hardware timestamp filter before ptp4l starts.\n"
+            "tx=1 enables TX hardware timestamps; rx=12 stamps PTPv2 and 802.1AS\n"
+            "event packets (any layer) and suppresses PTPv1 – right for sync67.\n"
+            "Drivers without support just log an error; the start chain continues.\n"
+            "Read-back can show 'no support for non-destructive SIOCGHWTSTAMP'\n"
+            "on drivers without read support – harmless as well.")
 
         # Set all to checked by default
         self.gro_check.setChecked(True)
@@ -78,6 +86,7 @@ class SettingsDialog(QDialog):
         self.mcast_event_check.setChecked(True)
         self.mcast_pdelay_check.setChecked(True)
         self.wol_check.setChecked(True)
+        self.hwstamp_check.setChecked(True)
 
         settings_layout.addRow(self.gro_check)
         settings_layout.addRow(self.gso_check)
@@ -89,6 +98,7 @@ class SettingsDialog(QDialog):
         settings_layout.addRow(self.mcast_event_check)
         settings_layout.addRow(self.mcast_pdelay_check)
         settings_layout.addRow(self.wol_check)
+        settings_layout.addRow(self.hwstamp_check)
 
         settings_group.setLayout(settings_layout)
         content_layout.addWidget(settings_group)
@@ -178,6 +188,7 @@ class SettingsDialog(QDialog):
         settings.setValue("mcast_event", self.mcast_event_check.isChecked())
         settings.setValue("mcast_pdelay", self.mcast_pdelay_check.isChecked())
         settings.setValue("wol_d", self.wol_check.isChecked())
+        settings.setValue("hwstamp_filter", self.hwstamp_check.isChecked())
         settings.setValue("stop_timesyncd", self.timesyncd_check.isChecked())
         settings.setValue("stop_chronyd", self.chronyd_check.isChecked())
         settings.setValue("stop_ntpd", self.ntpd_check.isChecked())
@@ -196,6 +207,8 @@ class SettingsDialog(QDialog):
         self.mcast_event_check.setChecked(settings.value("mcast_event", True, type=bool))
         self.mcast_pdelay_check.setChecked(settings.value("mcast_pdelay", True, type=bool))
         self.wol_check.setChecked(settings.value("wol_d", True, type=bool))
+        self.hwstamp_check.setChecked(
+            settings.value("hwstamp_filter", True, type=bool))
         self.timesyncd_check.setChecked(settings.value("stop_timesyncd", True, type=bool))
         self.chronyd_check.setChecked(settings.value("stop_chronyd", True, type=bool))
         self.ntpd_check.setChecked(settings.value("stop_ntpd", True, type=bool))
