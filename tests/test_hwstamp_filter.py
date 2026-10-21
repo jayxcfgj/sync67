@@ -87,8 +87,19 @@ def check_dialog_default():
               hasattr(dlg, "hwstamp_check"))
         if hasattr(dlg, "hwstamp_check"):
             check("default ON", dlg.hwstamp_check.isChecked())
-            check("Tooltip gesetzt",
-                  bool(dlg.hwstamp_check.toolTip().strip()))
+            tip = dlg.hwstamp_check.toolTip()
+            check("Tooltip: rx-filter-Tabelle vollstaendig (0..14)",
+                  all(s in tip for s in (
+                      "no incoming packet", "any incoming packet",
+                      "PTP v1, UDP", "PTP v2, UDP",
+                      "802.AS1, Ethernet", "any layer")),
+                  tip[:120])
+            check("Tooltip: sync67-Wert markiert (rx=12)",
+                  "12  PTP v2/802.AS1" in tip and "sync67" in tip)
+            check("Tooltip: tx-Typen erklaert",
+                  "tx types" in tip and "0 = disable, 1 = enable" in tip)
+            check("Tooltip: Upscaling-Hinweis (rx=1)",
+                  "rx=1 = all" in tip, tip[-200:])
     _with_clean_settings(run)
 
 

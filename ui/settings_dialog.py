@@ -69,11 +69,30 @@ class SettingsDialog(QDialog):
         self.hwstamp_check = QCheckBox("Set HW timestamp filter (hwstamp_ctl -t 1 -r 12)")
         self.hwstamp_check.setToolTip(
             "Sets the driver-level hardware timestamp filter before ptp4l starts.\n"
-            "tx=1 enables TX hardware timestamps; rx=12 stamps PTPv2 and 802.1AS\n"
-            "event packets (any layer) and suppresses PTPv1 – right for sync67.\n"
-            "Drivers without support just log an error; the start chain continues.\n"
-            "Read-back can show 'no support for non-destructive SIOCGHWTSTAMP'\n"
-            "on drivers without read support – harmless as well.")
+            "sync67 sends tx=1 (TX hw timestamps on) + rx=12\n"
+            "(PTPv2/802.1AS event packets, any layer; PTPv1 suppressed).\n"
+            "\n"
+            "rx filters (hwstamp_ctl -r):\n"
+            "  0  time stamp no incoming packet at all\n"
+            "  1  time stamp any incoming packet\n"
+            "  2  (reserved value)\n"
+            "  3  PTP v1, UDP, any kind of event packet\n"
+            "  4  PTP v1, UDP, Sync packet\n"
+            "  5  PTP v1, UDP, Delay_req packet\n"
+            "  6  PTP v2, UDP, any kind of event packet\n"
+            "  7  PTP v2, UDP, Sync packet\n"
+            "  8  PTP v2, UDP, Delay_req packet\n"
+            "  9  802.AS1, Ethernet, any kind of event packet\n"
+            " 10  802.AS1, Ethernet, Sync packet\n"
+            " 11  802.AS1, Ethernet, Delay_req packet\n"
+            " 12  PTP v2/802.AS1, any layer, any kind of event packet  <- sync67\n"
+            " 13  PTP v2/802.AS1, any layer, Sync packet\n"
+            " 14  PTP v2/802.AS1, any layer, Delay_req packet\n"
+            "tx types (hwstamp_ctl -t): 0 = disable, 1 = enable.\n"
+            "\n"
+            "Read-back note: drivers may report a more general filter than\n"
+            "requested (e.g. rx=1 = all, rx=2 = some) – harmless, just broader.\n"
+            "Drivers without support log an error; the start chain continues.")
 
         # Set all to checked by default
         self.gro_check.setChecked(True)
